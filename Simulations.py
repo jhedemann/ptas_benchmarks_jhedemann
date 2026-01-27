@@ -700,8 +700,10 @@ def run_simulations(
 
             status_ts.append(result.status)
             internals_ts.append(internals)
+
         if i/len(signal) != (i-1)/len(signal):
             print(f"progress: {i/len(signal)}/100")
+            
     stims_sp = list(filter(lambda x: x >= 0 and x < len(signal), stims_sp))
 
     return SimulationResult(dataset, phase_tracker, stims_sp, status_ts,

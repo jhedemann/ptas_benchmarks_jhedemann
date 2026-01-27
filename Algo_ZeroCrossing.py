@@ -62,12 +62,14 @@ class PhaseTracker:
         )
 
         # filtering for IEDs
-        self.freqs = [20, 80]
         self.lookback = 0.15 # mean delay between positive spike and negative trough of IED
         self.filter_thr = 300 # uV, changed from 520
-        self.sos = butter(4, [20, 80], btype="bandpass", fs=fs, output="sos")
-        self.zi = sosfilt_zi(self.sos)
-        self._filtered_history = deque(maxlen=history_len)
+        self.high_sos = butter(4, [20, 80], btype="bandpass", fs=fs, output="sos")
+        self.high_zi = sosfilt_zi(self.high_sos)
+        self._high_filtered_history = deque(maxlen=history_len)
+        self.low_sos = butter(4, [0.5, 4.0], btype="bandpass", fs=fs, output="sos")
+        self.low_zi = sosfilt_zi(self.low_sos)
+        self._low_filtered_history = deque(maxlen=history_len)
 
         # timing
         self.min_interval_sp = int(min_interval_ms * fs / 1000)
@@ -91,6 +93,11 @@ class PhaseTracker:
         self._current_time_sp += 1
         internals = {'phase': np.nan}
 
+        # low frequency band filter
+        low_signal, self.low_zi = sosfilt(self.low_sos, [signal], zi=self.low_zi)
+        low_signal = low_signal[0]
+        self._low_filtered_history.append(low_signal)
+
         # backoff / ISI logic
         if self._current_time_sp - self._last_stim_sp == self.interstim_sp:
             return PhaseTrackerResult(PhaseTrackerStatus.STIM2), internals
@@ -102,21 +109,21 @@ class PhaseTracker:
         if self._last_value is not None:
 
             # negative-going ZC
-            if self._last_value > 0 and signal <= 0:
+            if self._last_value > 0 and low_signal <= 0:
                 self._negzc_time = self._current_time_sp - 1
-                self._neg_peak = signal
+                self._neg_peak = low_signal
                 self._neg_peak_time = self._current_time_sp - 1
                 self._awaiting_poszc = True
 
             elif self._awaiting_poszc:
 
                 # track trough
-                if signal < self._neg_peak:
-                    self._neg_peak = signal
+                if low_signal < self._neg_peak:
+                    self._neg_peak = low_signal
                     self._neg_peak_time = self._current_time_sp - 1
 
                 # positive-going ZC
-                if self._last_value < 0 and signal >= 0:
+                if self._last_value < 0 and low_signal >= 0:
                     poszc_time = self._current_time_sp - 1
                     interval = poszc_time - self._negzc_time
 
@@ -127,19 +134,19 @@ class PhaseTracker:
                     amp_thr = self.amp_est.value(self.base_min_peak_uv)
                     internals["amp_thr"] = amp_thr
 
-                    # high frequency band filter
-                    filtered_sample, self.zi = sosfilt(self.sos, [signal], zi=self.zi)
-                    self._filtered_history.append(filtered_sample[0])
-                    hf_window = list(self._filtered_history)
+                    # # high frequency band filter
+                    # high_filtered_sample, self.high_zi = sosfilt(self.high_sos, [signal], zi=self.high_zi)
+                    # self._high_filtered_history.append(high_filtered_sample[0])
+                    # hf_window = list(self._high_filtered_history)
 
-                    if np.max(hf_window) > self.filter_thr:
-                        print(f"max filtered amp at this point is {np.max(hf_window)}")
+                    # if np.max(hf_window) > self.filter_thr:
+                    #     print(f"max filtered amp at this point is {np.max(hf_window)}")
 
                     # final SW decision
                     if (
                         self._neg_peak <= amp_thr
                         and self.min_interval_sp <= interval <= self.max_interval_sp
-                        and np.max(hf_window) <= self.filter_thr
+                        # and np.max(hf_window) <= self.filter_thr
                     ):
                         self._last_stim_sp = self._current_time_sp
                         self._awaiting_poszc = False
@@ -154,5 +161,5 @@ class PhaseTracker:
 
                     self._awaiting_poszc = False
 
-        self._last_value = signal
+        self._last_value = low_signal
         return PhaseTrackerResult(PhaseTrackerStatus.WRONGPHASE), internals
