@@ -1,6 +1,8 @@
 # %% IMPORTS
 
 import numpy as np
+from pathlib import Path
+import re
 import pickle
 
 from load_intracranial_data import load_data_as_dataset
@@ -11,39 +13,50 @@ from Algo_TWave import PhaseTracker as TWave
 
 # %%
 
-time_excerpt = 600 # seconds
+time_excerpt = 60 # seconds
 sampling_rate = 512 # hz
-ds = load_data_as_dataset(npy_path="/home/jhedemann/slow-wave/annotated/Patient03_Channel1_EEG.npy",
-                          fs=sampling_rate)
-if time_excerpt != 0:
-    ds_trunc = ds.signal.squeeze().astype(float)[:time_excerpt*sampling_rate]
-else:
-    ds_trunc = ds.signal.squeeze().astype(float)
 
-#%% 
+# %% RUN ALGO ON ALL PARTICIPANTS AND CHANNELS
 
-print("ds.fs:", ds.fs)
-print("ds.signal.shape:", np.asarray(ds.signal).shape)
-print("ds_trunc.shape:", ds_trunc.shape)
-print("len(ds_trunc):", len(ds_trunc))
-print("duration_s (from ds_trunc):", len(ds_trunc)/ds.fs)
+DATA_DIR = Path("data/annotated")
+
+pat = re.compile(r"^Patient(?P<p>\d+)_Channel(?P<c>\d+)_(?P<kind>.+)\.npy$")
+
+def parse_name(fname: str):
+    m = pat.match(fname)
+    if not m:
+        return None
+    return int(m["p"]), int(m["c"]), m["kind"]
+
+# 1) Index all files by (patient, channel, kind)
+index = {}
+for fp in DATA_DIR.glob("*.npy"):
+    parsed = parse_name(fp.name)
+    if not parsed:
+        continue
+    p, c, kind = parsed
+    index[(p, c, kind)] = fp
+
+# 2) Collect all EEG pairs we can run
+pairs = []
+for (p, c, kind), eeg_fp in index.items():
+    if kind != "EEG":
+        continue
+    negsw_fp = index.get((p, c, "negSWs"))  # only negative slow waves
+    pairs.append((p, c, eeg_fp, negsw_fp))
+
+pairs.sort()
 
 # %%
 
-ds_sim = Simulations.SimulationDataset(
-    t=np.arange(len(ds_trunc)) / ds.fs,
-    signal=ds_trunc,
-    fs=ds.fs,
-    name=ds.name + f"_p03-c1_ds{ds.fs}",
-)
+for p, c, eeg_fp, negsw_fp in pairs:
 
-rslt = Simulations.run_simulations(ds_sim, TWave(ds_sim.fs))
+    if p >= 9:
+        continue
 
-# %%
+    ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=time_excerpt)
 
-with open("results/results_twave_patient03_channel1_22_param_changed.pkl", "wb") as f:
-    pickle.dump(rslt, f)
+    result = Simulations.run_simulations(ds, TWave(fs=ds.fs))
 
-# %%
-
-print(rslt.stims_sp)
+    with open(f"results/run_all/run22/results_twave_all_p{p}_c{c}.pkl", "wb") as f:
+        pickle.dump(result, f)

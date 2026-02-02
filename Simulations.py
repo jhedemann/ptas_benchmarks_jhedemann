@@ -63,13 +63,13 @@ class SimulationResult():
 
     def __init__(self, Dataset: SimulationDataset, PhaseTracker: object,
                  stims_sp: list, status_ts: List[PhaseTrackerStatus],
-                 internals_ts: List[dict]):
+                 internals_ts: List[dict], wave_detected_sp: list):
         self.Dataset = Dataset
         self.PhaseTracker = PhaseTracker
         self.stims_sp = stims_sp
         self.status_ts = status_ts
         self.internals_ts = internals_ts
-
+        self.wave_detected_sp = wave_detected_sp
         self.computed_stim_phases = {}
 
     def plot_timeseries(
@@ -689,6 +689,7 @@ def run_simulations(
     stims_sp = []
     internals_ts = []
     status_ts = []
+    wave_detected_sp = []
 
     # Process the signal in blocks
     for i in range(0, len(signal), block_size_sp):
@@ -697,6 +698,7 @@ def run_simulations(
             result, internals = phase_tracker.update(sample)
             if result.status & PhaseTrackerStatus.STIM1:
                 stims_sp.append(i + si + result.delay_sp)
+                wave_detected_sp.append(i+si)
 
             status_ts.append(result.status)
             internals_ts.append(internals)
@@ -707,7 +709,7 @@ def run_simulations(
     stims_sp = list(filter(lambda x: x >= 0 and x < len(signal), stims_sp))
 
     return SimulationResult(dataset, phase_tracker, stims_sp, status_ts,
-                            internals_ts)
+                            internals_ts, wave_detected_sp)
 
 
 def generate_sine(

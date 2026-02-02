@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 from Algo_ZeroCrossing import RollingQuantileThreshold
+from Algo_Laurent import _OnlineSOSFilter
 import Simulations
 
 # %% PREP
@@ -120,11 +121,12 @@ plt.show()
 
 # Regex to extract p and c from: results_zerocross_run_all_p3_c1.pkl
 result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
+run_num = 29
 
 all_results = []
 tol_range = np.linspace(0.1, 1, num=10)
 
-for res_file in os.listdir("results/run_all/run11"):
+for res_file in os.listdir(f"results/run_all/run{run_num}"):
     # extract IDs
     match = result_pat.search(res_file)
     if not match: continue
@@ -135,12 +137,15 @@ for res_file in os.listdir("results/run_all/run11"):
     gt_filename = f"Patient{int(p):02d}_Channel{c}_negSWs.npy"
     gt_path = os.path.join("data/annotated", gt_filename)
     
+    if int(p) >= 12:
+        continue
+
     if not os.path.exists(gt_path):
         print(f"Warning: No ground truth found for P{p} C{c}")
         continue
 
     # load and process
-    with open(f"results/run_all/run11/{res_file}", "rb") as f:
+    with open(f"results/run_all/run{run_num}/{res_file}", "rb") as f:
         this_result = pickle.load(f)
     
     this_times = np.array(this_result.stims_sp) / this_result.Dataset.fs
@@ -168,7 +173,7 @@ print(all_results.shape)
 
 # %%
 
-print(all_results[0].shape)
+print(all_results)
 print(len(tol_results))
 # %%
 
@@ -186,8 +191,9 @@ for result in all_results:
     all_stats.append((sens, prec, f1))
 
 all_stats = np.array(all_stats)
-mean_all = np.mean(all_stats, axis=0)
-std_all = np.std(all_stats, axis=0)
+mean_all = np.nanmean(all_stats, axis=0)
+std_all = np.nanstd(all_stats, axis=0)
+print(mean_all)
 
 plt.figure(figsize=(8, 5))
 
@@ -212,9 +218,14 @@ plt.show()
 
 # %%
 
-print(np.argmin(all_stats[:,1,-1]))
+best_run = np.nanargmax(all_stats[:,1,-1])
+
+print(all_stats[:,1,-1])
+print(best_run)
 print(np.min(all_stats[:,1,-1]))
 print(p)
+
+print(os.listdir(f"results/run_all/run{run_num}")[best_run])
 
 # %%
 print(all_stats[27,1,:])
@@ -242,7 +253,4 @@ plt.legend()
 plt.grid(axis='y', alpha=0.3)
 plt.tight_layout()
 plt.show()
-
-
-
 # %%

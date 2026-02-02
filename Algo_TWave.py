@@ -24,14 +24,14 @@ class PhaseTracker():
         self.backoff_time_s = 5.0
         self.quadrature_thresh = 0.5 # changed from 0.8, 0.2
         self.quadrature_len_s = 2.0 # changed from 1.0, 2.0
-        self.freq_limits_hz = [0.6, 2.0]
+        self.freq_limits_hz = [0.6, 4.0]
 
         self.stim2_start_delay_s = 0.6
         self.stim2_end_delay_s = 5.0
         self.stim2_prediction_limit_s = 0.15
 
         self.high_low_analysis = True
-        self.high_freq_vals_hz = [10, 40, 70] # changed from [10, 20, 30]
+        self.high_freq_vals_hz = [20, 40, 80] # changed from [10, 20, 30]
         self.high_low_freq_ratio = 0.50 # changed from 0.15
         self.high_low_freq_lookback_ratio = 0.50 # changed from 0.15
         self.high_low_lookback_nblocks = 5
@@ -50,7 +50,7 @@ class PhaseTracker():
 
         # filters
         if fs > 120:
-            self.notch_filter = scipy.signal.iirnotch(60, 20, fs=fs)
+            self.notch_filter = scipy.signal.iirnotch(50, 20, fs=fs) # w0 changed from 60 -> mains noise is at 50
             self.notch_filter_zi = scipy.signal.lfilter_zi(*self.notch_filter)
         else:
             self.notch_filter = None

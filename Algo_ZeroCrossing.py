@@ -63,8 +63,9 @@ class PhaseTracker:
 
         # filtering for IEDs
         self.lookback = 0.15 # mean delay between positive spike and negative trough of IED
-        self.filter_thr = 300 # uV, changed from 520
-        self.high_sos = butter(4, [20, 80], btype="bandpass", fs=fs, output="sos")
+        self.filter_thr = 120 # uV, changed from 900, 300, 520
+        # self.high_sos = butter(4, [20, 80], btype="bandpass", fs=fs, output="sos")
+        self.high_sos = butter(4, 90, btype="highpass", fs=fs, output="sos")
         self.high_zi = sosfilt_zi(self.high_sos)
         self._high_filtered_history = deque(maxlen=history_len)
         self.low_sos = butter(4, [0.5, 4.0], btype="bandpass", fs=fs, output="sos")
@@ -134,19 +135,19 @@ class PhaseTracker:
                     amp_thr = self.amp_est.value(self.base_min_peak_uv)
                     internals["amp_thr"] = amp_thr
 
-                    # # high frequency band filter
-                    # high_filtered_sample, self.high_zi = sosfilt(self.high_sos, [signal], zi=self.high_zi)
-                    # self._high_filtered_history.append(high_filtered_sample[0])
-                    # hf_window = list(self._high_filtered_history)
+                    # high frequency band filter
+                    high_filtered_sample, self.high_zi = sosfilt(self.high_sos, [signal], zi=self.high_zi)
+                    self._high_filtered_history.append(high_filtered_sample[0])
+                    hf_window = list(self._high_filtered_history)
 
-                    # if np.max(hf_window) > self.filter_thr:
-                    #     print(f"max filtered amp at this point is {np.max(hf_window)}")
+                    if np.max(hf_window) > self.filter_thr:
+                        print(f"max filtered amp at this point is {np.max(hf_window)}")
 
                     # final SW decision
                     if (
                         self._neg_peak <= amp_thr
                         and self.min_interval_sp <= interval <= self.max_interval_sp
-                        # and np.max(hf_window) <= self.filter_thr
+                        and np.max(hf_window) <= self.filter_thr
                     ):
                         self._last_stim_sp = self._current_time_sp
                         self._awaiting_poszc = False

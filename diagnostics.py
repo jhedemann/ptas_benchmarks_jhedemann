@@ -8,7 +8,8 @@ import Simulations
 from Simulations import PhaseTrackerStatus
 import os
 from scipy import stats
-from scipy.signal import butter, sosfiltfilt
+from scipy.signal import butter, sosfilt, sosfilt_zi, sosfiltfilt
+import re
 
 from analyze_time_frequency import get_p_c_struct, filter_for_competing_events, find_minima, find_maxima
 from load_intracranial_data import load_data_as_dataset
@@ -25,7 +26,7 @@ with open("results/results_zerocross_patient03_channel1_08_newbackoff_sp.pkl", "
 
 data_dir = "data/annotated"
 p_c_struct = get_p_c_struct(data_dir)
-run_dir = "results/run_all/run11"
+run_dir = "results/run_all/run19"
 fs = 512
 
 # %% COMPUTE MEAN ABSOLUTE AMPLITUDE AROUND GROUND TRUTH SLOW WAVE VS NON-SLOW-WAVE
@@ -255,7 +256,7 @@ for val in amp_values:
 
 max_amps_sw = []
 max_amps_ied = []
-
+max_amps_fp = []
 
 for p, cs in p_c_struct.items():
 
@@ -273,6 +274,14 @@ for p, cs in p_c_struct.items():
 
         dataset = load_data_as_dataset(signal_filepath, fs=fs)
 
+        result_filename = f"results_zerocrossrun_all_p{int(p)}_c{c}.pkl"
+        result_filepath = os.path.join(run_dir, result_filename)
+
+        with open(result_filepath, "rb") as f:
+            this_result = pickle.load(f)
+
+        detected_sws = np.array(this_result.stims_sp)
+
         signal = dataset.signal
 
         arr_sws = np.load(sws_filepath)
@@ -280,41 +289,52 @@ for p, cs in p_c_struct.items():
 
         # filter for competing events
         filtered_arr_ied, filtered_arr_sw = filter_for_competing_events(arr_ieds, arr_sws, buffer_s=4)
-        
+
+        # filter such that only detected slow waves that aren't slow waves remain
+        filtered_detected_sws, arr_sws = filter_for_competing_events(detected_sws, arr_sws, buffer_s=2)
+
         # find maxima of sws
-        sw_maxima = find_maxima(signal, filtered_arr_sw, fs=fs, window_size_s=4, low_pass=4)
+        sw_maxima = find_maxima(signal, filtered_arr_sw, fs=fs, window_size_s=1)
 
         # find maxima of ieds
-        ied_maxima = find_maxima(signal, filtered_arr_ied, fs=fs, window_size_s=4, low_pass=4)
+        ied_maxima = find_maxima(signal, filtered_arr_ied, fs=fs, window_size_s=1)
+
+        # find maxima of false positives
+        fp_maxima = find_maxima(signal, filtered_detected_sws, fs=fs, window_size_s=1)
 
         # compute amplitudes at maxima
         this_max_amps_sw = signal[sw_maxima]
         this_max_amps_ied = signal[ied_maxima]
+        this_max_amps_fp = signal[fp_maxima]
 
         # extend list 
         max_amps_sw.extend(this_max_amps_sw)
         max_amps_ied.extend(this_max_amps_ied)
+        max_amps_fp.extend(this_max_amps_fp)
 
 mean_max_amp_sw = np.mean(max_amps_sw)
 mean_max_amp_ied = np.mean(max_amps_ied)
+mean_max_amps_fp = np.mean(max_amps_fp)
 
 print("")
-print(mean_max_amp_sw, mean_max_amp_ied)
+print(mean_max_amp_sw, mean_max_amp_ied, mean_max_amps_fp)
 
 plt.hist(max_amps_ied, bins=50, alpha=0.3, density=True, label="IED pos amps")
 plt.hist(max_amps_sw, bins=50, alpha=0.3, density=True, label="SW pos amps")
+plt.hist(max_amps_fp, bins=50, alpha=0.3, density=True, label="FP pos amps")
 plt.legend()
 plt.show()
 
-p_range = [90, 95, 99, 99.9]
+p_range = [20, 30, 40, 50, 60, 70, 80, 90, 95, 99, 99.9]
 sw_percentiles = np.nanpercentile(max_amps_sw, p_range)
 ied_percentiles = np.nanpercentile(max_amps_ied, p_range)
+fp_percentiles = np.nanpercentile(max_amps_fp, p_range)
 
 # Print the results in a readable format
-print(f"{'Percentile':<12} | {'SW':<10} | {'IED':<10}")
+print(f"{'Percentile':<12} | {'SW':<10} | {'IED':<10} | {'FP':<10}")
 print("-" * 35)
-for p, sw_val, ied_val in zip(p_range, sw_percentiles, ied_percentiles):
-    print(f"{p:<12} | {sw_val:>10.2f} | {ied_val:>10.2f}")
+for p, sw_val, ied_val, fp_val in zip(p_range, sw_percentiles, ied_percentiles, fp_percentiles):
+    print(f"{p:<12} | {sw_val:>10.2f} | {ied_val:>10.2f} | {fp_val:>10.2f}")
 
 # Define the specific amplitudes you want to check
 amp_values = [2000, 3000, 4000, 5000]
@@ -677,6 +697,7 @@ print(fwhm_ratios_ieds.shape)
 max_amps_sw = []
 max_amps_ied = []
 max_amps_fp = []
+max_amps_fn = []
 
 for p, cs in p_c_struct.items():
 
@@ -704,8 +725,9 @@ for p, cs in p_c_struct.items():
 
         signal = dataset.signal
 
-        sos = butter(4, [20, 80], btype="bandpass", fs=fs, output="sos")
-        hf_signal = sosfiltfilt(sos, signal)
+        sos = butter(4, 90, btype="highpass", fs=fs, output="sos")
+        zi = sosfilt_zi(sos)
+        hf_signal, zi = sosfilt(sos, signal, zi=zi)
 
         arr_sws = np.load(sws_filepath)
         arr_ieds = np.load(ieds_filepath)
@@ -714,8 +736,8 @@ for p, cs in p_c_struct.items():
         filtered_arr_ied, filtered_arr_sw = filter_for_competing_events(arr_ieds, arr_sws, buffer_s=4)
         
         # filter such that only detected slow waves that aren't slow waves remain
-        filtered_detected_sws, arr_sws = filter_for_competing_events(detected_sws, arr_sws, buffer_s=2)
-        
+        filtered_detected_sws, filtered_undetected_sws = filter_for_competing_events(detected_sws, arr_sws, buffer_s=2)
+
         # find maxima of sws
         sw_minima = find_minima(signal, filtered_arr_sw, fs=fs, window_size_s=1)
         sw_maxima = find_maxima(hf_signal, sw_minima/fs-0.15, fs=fs, window_size_s=0.2)
@@ -725,31 +747,40 @@ for p, cs in p_c_struct.items():
         # find maxima of false positives
         fp_minima = find_minima(signal, filtered_detected_sws, fs=fs, window_size_s=1)
         fp_maxima = find_maxima(hf_signal, fp_minima/fs-0.15, fs=fs, window_size_s=0.2)
+        # find maxima of false negatives
+        fn_minima = find_minima(signal, filtered_undetected_sws, fs=fs, window_size_s=1)
+        fn_maxima = find_maxima(hf_signal, fn_minima/fs-0.15, fs=fs, window_size_s=0.2)
 
         # compute high frequency amplitude 150 ms before minimum
         this_max_amps_sw = hf_signal[sw_maxima]
         this_max_amps_ied = hf_signal[ied_maxima]
         this_max_amps_fp = hf_signal[fp_maxima]
+        this_max_amps_fn = hf_signal[fn_maxima]
         #print(len(this_max_amps_sw))
         # extend list 
         max_amps_sw.extend(this_max_amps_sw)
         max_amps_ied.extend(this_max_amps_ied)
         max_amps_fp.extend(this_max_amps_fp)
+        max_amps_fn.extend(this_max_amps_fn)
 
 print(len(max_amps_sw))
 print(len(max_amps_ied))
 print(len(max_amps_fp))
+print(len(max_amps_fn))
 
 mean_max_amp_sw = np.mean(max_amps_sw)
 mean_max_amp_ied = np.mean(max_amps_ied)
 mean_max_amp_fp = np.mean(max_amps_fp)
+mean_max_amp_fn = np.mean(max_amps_fn)
 
 print("")
-print(mean_max_amp_sw, mean_max_amp_ied, mean_max_amp_fp)
+print(mean_max_amp_sw, mean_max_amp_ied, mean_max_amp_fp, mean_max_amp_fn)
 
-plt.hist(max_amps_ied, bins=50, alpha=0.3, density=True, label="IED pos amps")
-plt.hist(max_amps_sw, bins=50, alpha=0.3, density=True, label="SW pos amps")
-plt.hist(max_amps_fp, bins=50, alpha=0.3, density=True, label="FP pos amps")
+#plt.hist(max_amps_ied, bins=50, alpha=0.3, density=True, label="IED pos amps")
+#plt.hist(max_amps_sw, bins=50, alpha=0.3, density=True, label="SW pos amps")
+plt.hist(max_amps_fp, bins=20, alpha=0.3, density=True, label="FP pos amps")
+plt.hist(max_amps_fn, bins=20, alpha=0.3, density=True, label="FN pos amps")
+
 plt.legend()
 plt.show()
 
@@ -757,32 +788,148 @@ p_range = [20, 30, 40, 50, 60, 70, 80, 90, 95, 99, 99.9]
 sw_percentiles = np.nanpercentile(max_amps_sw, p_range)
 ied_percentiles = np.nanpercentile(max_amps_ied, p_range)
 fp_percentiles = np.nanpercentile(max_amps_fp, p_range)
+fn_percentiles = np.nanpercentile(max_amps_fn, p_range)
+
 
 # Print the results in a readable format
-print(f"{'Percentile':<12} | {'SW':<10} | {'IED':<10}")
+print(f"{'Percentile':<12} | {'SW':<10} | {'IED':<10} | {'FP':<10} | {'FN':<10}")
 print("-" * 35)
-for p, sw_val, ied_val, fp_val in zip(p_range, sw_percentiles, ied_percentiles, fp_percentiles):
-    print(f"{p:<12} | {sw_val:>10.2f} | {ied_val:>10.2f}| {fp_val:>10.2f}") 
+for p, sw_val, ied_val, fp_val, fn_val in zip(p_range, sw_percentiles, ied_percentiles, fp_percentiles, fn_percentiles):
+    print(f"{p:<12} | {sw_val:>10.2f} | {ied_val:>10.2f} | {fp_val:>10.2f} | {fn_val:>10.2f}") 
 
-# Define the specific amplitudes you want to check
-amp_values = [2000, 3000, 4000, 5000]
+# # Define the specific amplitudes you want to check
+# amp_values = [2000, 3000, 4000, 5000]
 
-# Convert lists to numpy arrays
-sw_array = np.array(max_amps_sw)
-ied_array = np.array(max_amps_ied)
+# # Convert lists to numpy arrays
+# sw_array = np.array(max_amps_sw)
+# ied_array = np.array(max_amps_ied)
 
-# Use the arrays for the masking operation
-sw_clean = sw_array[~np.isnan(sw_array)]
-ied_clean = ied_array[~np.isnan(ied_array)]
+# # Use the arrays for the masking operation
+# sw_clean = sw_array[~np.isnan(sw_array)]
+# ied_clean = ied_array[~np.isnan(ied_array)]
 
-# Print the results in the same structure as before
-print(f"{'Amplitude':<12} | {'SW %-tile':<10} | {'IED %-tile':<10}")
-print("-" * 38)
+# # Print the results in the same structure as before
+# print(f"{'Amplitude':<12} | {'SW %-tile':<10} | {'IED %-tile':<10}")
+# print("-" * 38)
 
-for val in amp_values:
-    # kind='rank' gives the percentage of values less than or equal to the score
-    sw_p = stats.percentileofscore(sw_clean, val, kind='rank')
-    ied_p = stats.percentileofscore(ied_clean, val, kind='rank')
+# for val in amp_values:
+#     # kind='rank' gives the percentage of values less than or equal to the score
+#     sw_p = stats.percentileofscore(sw_clean, val, kind='rank')
+#     ied_p = stats.percentileofscore(ied_clean, val, kind='rank')
     
-    print(f"{val:<12} | {sw_p:>10.2f}% | {ied_p:>10.2f}%")
- # %%
+#     print(f"{val:<12} | {sw_p:>10.2f}% | {ied_p:>10.2f}%")
+# %% INSPECT QUADRATURE VALUES
+
+# Regex to extract p and c from: results_zerocross_run_all_p3_c1.pkl
+result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
+run_num = 22
+
+all_internals = []
+stim_internals = []
+first_internals = []
+
+all_statuses = []
+
+stim_internals_dict = {}
+
+for res_file in os.listdir(f"results/run_all/run{run_num}"):
+    # extract IDs
+    match = result_pat.search(res_file)
+    if not match: continue
+    p, c = match.group('p'), match.group('c')
+    
+    # construct the specific ground truth filename
+    # assuming the format is Patient03_Channel1_negSWs.npy
+    gt_filename = f"Patient{int(p):02d}_Channel{c}_negSWs.npy"
+    gt_path = os.path.join("data/annotated", gt_filename)
+    
+    if not os.path.exists(gt_path):
+        print(f"Warning: No ground truth found for P{p} C{c}")
+        continue
+
+    # load and process
+    with open(f"results/run_all/run{run_num}/{res_file}", "rb") as f:
+        this_result = pickle.load(f)
+    
+    this_internals = np.array(this_result.internals_ts) # / this_result.Dataset.fs
+    this_times = np.array(this_result.stims_sp, dtype=int)
+    this_first = np.array(this_result.wave_detected_sp, dtype=int)
+    this_statuses = np.array(this_result.status_ts)
+
+    this_stim_internals = this_internals[this_times]
+    this_first_internals = this_internals[this_first]
+    # this_sws = np.load(gt_path)
+    # this_sws = np.array([x for x in this_sws if x <= this_result.Dataset.t.max()])
+
+    # # Check for empty ground truth
+    # if len(this_sws) == 0:
+    #     print(f"Skipping P{p} C{c}: No ground truth slow waves found.")
+        
+    #     # append NaNs if you need to keep a fixed index
+    #     all_internals.append()
+    #     continue
+
+    all_internals.extend(this_internals)
+    stim_internals.extend(this_stim_internals)
+    first_internals.extend(this_first_internals)
+    all_statuses.extend(this_statuses)
+
+    stim_internals_dict[f"{p}_{c}"] = this_stim_internals
+
+all_internals = np.array(all_internals)
+stim_internals = np.array(stim_internals)
+first_internals = np.array(first_internals)
+all_statuses = np.array(all_statuses)
+
+print(all_internals.shape)
+print(stim_internals.shape)
+print(first_internals.shape)
+
+all_quadratures = np.array([i["quadrature"] for i in all_internals])
+stim_quadratures = np.array([i["quadrature"] for i in stim_internals])
+first_quadratures = np.array([i["quadrature"] for i in first_internals])
+
+print(np.mean(all_quadratures))
+print(np.mean(stim_quadratures))
+print(np.mean(first_quadratures))
+
+#plt.hist(all_quadratures, bins=50, alpha=0.5, density=True, label="all quadrature values")
+plt.hist(stim_quadratures, bins=50, alpha=0.5, density=True, label="stim quadrature values")
+plt.hist(first_quadratures, bins=50, alpha=0.5, density=True, label="first quadrature values")
+
+plt.legend()
+plt.show()
+
+all_phases = np.array([i["phase"] for i in all_internals])
+stim_phases = np.array([i["phase"] for i in stim_internals])
+first_phases = np.array([i["phase"] for i in first_internals])
+
+print(np.mean(all_phases))
+print(np.mean(stim_phases))
+print(np.mean(first_phases))
+
+#plt.hist(all_phases, bins=50, alpha=0.5, density=True, label="all phase values")
+plt.hist(stim_phases, bins=50, alpha=0.5, density=True, label="stim phase values")
+plt.hist(first_phases, bins=50, alpha=0.5, density=True, label="first phase values")
+
+plt.legend()
+plt.show()
+
+wrongphase_idx = np.array(np.where(all_statuses==32))
+
+print(type(wrongphase_idx))
+wrongphase_quad = all_quadratures[wrongphase_idx]
+non_wrongphase_quad = all_quadratures[~wrongphase_idx]
+
+plt.hist(wrongphase_quad, bins=50, alpha=0.5, density=True, label="wrongphase quadrature values")
+#plt.hist(all_quadratures, bins=50, alpha=0.5, density=True, label="all quadrature values")
+#plt.hist(stim_quadratures, bins=50, alpha=0.15, density=True, label="stim quadrature values")
+#plt.hist(first_quadratures, bins=50, alpha=0.15, density=True, label="first quadrature values")
+
+plt.legend()
+plt.show()
+print(stim_internals_dict)
+
+all_amps = np.array([i["amp"] for i in all_internals[:60*512]])
+
+plt.plot(all_amps)
