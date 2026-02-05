@@ -102,6 +102,10 @@ class SimulationResult():
         sos = scipy.signal.butter(4, [0.5, 4.0], btype="bandpass", fs=self.Dataset.fs, output="sos")
         filtered_signal = scipy.signal.sosfiltfilt(sos, self.Dataset.signal[time_mask])
 
+        amp_trace = [d["amp"] for d in self.internals_ts]
+        hl_ratio_trace = [d["hl_ratio"]*1000 for d in self.internals_ts]
+        quad_trace = [d["quadrature"]*1000 for d in self.internals_ts]
+
         # # Parse ground-truth markdown file
         # with open(ground_truth, "r", encoding="utf-8") as input_file:
         #     text = input_file.read()
@@ -131,13 +135,26 @@ class SimulationResult():
                  lw=0.1,
                  alpha=0.8)
         tax.plot(self.Dataset.t[time_mask],
-                 filtered_signal,
+                 amp_trace, # changed from filtered_signal
                  color='tab:blue',
+                 label='Morlet Amplitude')
+        tax.plot(self.Dataset.t[time_mask],
+                 filtered_signal,
+                 color='hotpink',
                  label='Filtered Signal')
+        tax.plot(self.Dataset.t[time_mask],
+                 hl_ratio_trace,
+                 color='limegreen',
+                 label='High Low Ratio')
+        tax.plot(self.Dataset.t[time_mask],
+                 quad_trace,
+                 color='orange',
+                 label='Quadrature')                           
         tax.vlines(arr_sw_trunc, -3000, 3000, colors="green")
         tax.vlines(arr_ied_trunc, -3000, 3000, colors="red")
         tax.set_title(f'{self.PhaseTracker.name} - {self.Dataset.name}')
         tax.set_ylabel('Signal')
+        tax.legend()
         tax.grid()
         if axis_kwargs:
             tax.set(**axis_kwargs)

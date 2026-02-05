@@ -18,11 +18,11 @@ class PhaseTracker():
         self.time_elapsed_s = 0.0  # float: in seconds, relative to end of last block/start of current block
 
         # store CLAS parameters
-        self.amp_threshold_uv = 600 # changed from 500, 250, 80
-        self.amp_limit_uv = 1500 # changed from 3000, 2000, 4000, 600
+        self.amp_threshold_uv = 3000 # changed from 4000, 2000, 80, 500, 250, 80
+        self.amp_limit_uv = 6000 # changed from 2000, 3000, 2000, 4000, 600
         self.prediction_limit_s = 0.15
-        self.backoff_time_s = 5.0
-        self.quadrature_thresh = 0.5 # changed from 0.8, 0.2
+        self.backoff_time_s = 2.5 # changed from 5.0
+        self.quadrature_thresh = 0.5 # changed from 0.5, 0.8, 0.2
         self.quadrature_len_s = 2.0 # changed from 1.0, 2.0
         self.freq_limits_hz = [0.6, 4.0]
 
@@ -32,7 +32,7 @@ class PhaseTracker():
 
         self.high_low_analysis = True
         self.high_freq_vals_hz = [20, 40, 80] # changed from [10, 20, 30]
-        self.high_low_freq_ratio = 0.50 # changed from 0.15
+        self.high_low_freq_ratio = 0.15 # changed from 0.15
         self.high_low_freq_lookback_ratio = 0.50 # changed from 0.15
         self.high_low_lookback_nblocks = 5
 
@@ -78,9 +78,22 @@ class PhaseTracker():
         w = 5
         s = lambda f: w * fs / (2 * pi * f)
 
-        # set of frequencies, to identify primary freq
-        self.wavelet_freqs = np.linspace(self.freq_limits_hz[0],
-                                         self.freq_limits_hz[1], 20)
+        # # set of frequencies, to identify primary freq -- LINEAR (OLD T-WAVE STYLE)
+        # self.wavelet_freqs = np.linspace(self.freq_limits_hz[0],
+        #                                  self.freq_limits_hz[1], 20)
+        
+        # More resolution at the low end (0.6Hz) - LOGARITHMIC (DAN H SAYS THIS IS BETTER)
+        self.wavelet_freqs = np.geomspace(self.freq_limits_hz[0], 
+                                        self.freq_limits_hz[1], 20)
+        
+        # Instead of np.linspace (linear) or np.geomspace (low-end heavy) -- POWER LAW, THIS IS PROBABLY WRONG, TO DELET
+        # low = self.freq_limits_hz[0]
+        # high = self.freq_limits_hz[1]
+        # num = 20
+
+        # # Squaring the linear progression (0 to 1) creates an exponential-like curve 
+        # # that crowds the "1.0" (high) end.
+        # self.wavelet_freqs = low + (high - low) * (np.linspace(0, 1, num)**2)
 
         # create wavelet for each frequency, truncated at the middle
         self.wavelet = [
@@ -252,6 +265,7 @@ class PhaseTracker():
 
             return PhaseTrackerResult(PhaseTrackerStatus.STIM2,
                                       int(delta_t * self.fs)), internals
+            # return PhaseTrackerResult(PhaseTrackerStatus.NONE), internals
 
     def estimate(self) -> Tuple[float, float, float, float, float]:
         '''
@@ -286,14 +300,33 @@ class PhaseTracker():
         # convolve the list of wavelets
         conv_vals = [np.dot(cdata, w) for w in self.wavelet]
 
-        # choose the one with highest amp/phase
-        amp_conv_vals = np.abs(conv_vals)
-        amp_max = np.argmax(amp_conv_vals)
+        # # choose the one with highest amp/phase
+        # amp_conv_vals = np.abs(conv_vals)
 
-        # create outputs
+        # amp_max = np.argmax(amp_conv_vals)
+
+        # # create outputs
+        # amp = amp_conv_vals[amp_max] / 2
+        # freq = self.wavelet_freqs[amp_max]
+        # # phase = np.angle(conv_vals[amp_max])
+        # phase = np.arctan2(np.real(conv_vals[amp_max]),
+        #                    np.imag(conv_vals[amp_max])) - (pi / 2)
+        # phase = phase % (2 * pi)
+
+        # Calculate raw amplitudes
+        amp_conv_vals = np.abs(conv_vals)
+
+        # 1/f Correction (Whitening) ###
+        corrected_amps = amp_conv_vals * self.wavelet_freqs 
+        
+        # Choose the one with the highest CORRECTED amplitude
+        amp_max = np.argmax(corrected_amps)
+
+        # create outputs (using raw amplitude for the actual amp value)
         amp = amp_conv_vals[amp_max] / 2
         freq = self.wavelet_freqs[amp_max]
-        # phase = np.angle(conv_vals[amp_max])
+        
+        # phase calculation...
         phase = np.arctan2(np.real(conv_vals[amp_max]),
                            np.imag(conv_vals[amp_max])) - (pi / 2)
         phase = phase % (2 * pi)
@@ -312,11 +345,11 @@ class PhaseTracker():
         est_phase = (np.arange(self.quadrature_sp) / self.fs) * freq * 2 * pi
         est_phase = est_phase - est_phase[-1] + phase
         est_sig = np.cos(est_phase)
-        est_sig = est_sig / np.trapz(np.abs(est_sig)) * est_sig.size
+        est_sig = est_sig / np.trapezoid(np.abs(est_sig)) * est_sig.size
 
         # normalize the signal
-        normsig = cdata[-self.quadrature_sp:] / np.trapz(
+        normsig = cdata[-self.quadrature_sp:] / np.trapezoid(
             np.abs(cdata[-self.quadrature_sp:])) * cdata.size
-        quadrature = np.trapz(normsig * est_sig) / cdata.size
+        quadrature = np.trapezoid(normsig * est_sig) / cdata.size
 
         return phase, freq, amp, quadrature, hl_ratio
