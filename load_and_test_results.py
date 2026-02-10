@@ -11,7 +11,7 @@ from Simulations import PhaseTrackerStatus
 
 # %% LOAD DATA
 
-with open("results/run_indiv/results_twave_all_p3_c1_41.pkl", "rb") as f:
+with open("results/run_all/run32/results_twave_all_p17_c2.pkl", "rb") as f:
     results_twave = pickle.load(f)
 
 
@@ -26,8 +26,8 @@ with open("results/run_indiv/results_twave_all_p3_c1_41.pkl", "rb") as f:
 # print(results_twave.PhaseTracker.__dict__)
 # %% SHOW MASTER PLOT OF RESULTS WITH GROUND TRUTH ANNOTATION
 
-results_twave.plot_timeseries(ground_truth_sw="data/annotated/Patient03_Channel1_negSWs.npy",
-                              ground_truth_ied="data/annotated/Patient03_Channel1_IEDs.npy")
+results_twave.plot_timeseries(ground_truth_sw="data/annotated/Patient17_Channel2_negSWs.npy",
+                              ground_truth_ied="data/annotated/Patient17_Channel2_IEDs.npy")
 plt.show()
 
 

@@ -51,15 +51,15 @@ pairs.sort()
 
 for p, c, eeg_fp, negsw_fp in pairs:
 
-    if not (p==3 and c==1):
-        continue
+    # if not (p==3 and c==1):
+    #     continue
 
-    ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=time_excerpt)
+    ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=None)
 
     result = Simulations.run_simulations(ds, TWave(fs=ds.fs))
 
     # with open(f"results/run_all/run31/results_twave_all_p{p}_c{c}.pkl", "wb") as f:
     #     pickle.dump(result, f)
 
-    with open(f"results/run_indiv/results_twave_all_p{p}_c{c}_41.pkl", "wb") as f:
+    with open(f"results/run_all/run32/results_twave_all_p{p}_c{c}.pkl", "wb") as f:
         pickle.dump(result, f)

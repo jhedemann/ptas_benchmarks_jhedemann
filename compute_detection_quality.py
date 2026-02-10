@@ -55,7 +55,7 @@ def get_p_c_struct(data_path):
 
     return struct_dict
 
-def compute_detection_quality(detected_sim, detected_true, tol=0.1):
+def compute_detection_quality_strict(detected_sim, detected_true, tol=0.1):
     detected_sim = np.array(detected_sim)
     detected_true = np.array(detected_true)
 
@@ -86,6 +86,60 @@ def compute_detection_quality(detected_sim, detected_true, tol=0.1):
         "TP": TP,
         "FP": FP,
         "FN": FN,
+        "ignored": np.nan,
+        "sensitivity": float(sensitivity),
+        "precision": float(precision),
+        "f1": float(f1)
+    }
+
+def compute_detection_quality_loose(detected_sim, detected_true, ieds, tol=0.1):
+    detected_sim = np.array(detected_sim)
+    detected_true = np.array(detected_true)
+    ieds = np.array(ieds)
+
+    used_true = np.zeros(len(detected_true), dtype=bool)
+
+    TP = 0
+    FP = 0
+    ignored_detections = 0
+
+    for d in detected_sim:
+        # 1. Check if it matches a ground truth slow wave (TP)
+        matched_slow_wave = False
+        if len(detected_true) > 0:
+            diffs_true = np.abs(detected_true - d)
+            idx_true = np.argmin(diffs_true)
+            if diffs_true[idx_true] <= tol and not used_true[idx_true]:
+                TP += 1
+                used_true[idx_true] = True
+                matched_slow_wave = True
+        
+        if matched_slow_wave:
+            continue
+
+        # 2. If it's NOT a slow wave, check if it's an IED (FP)
+        if len(ieds) > 0:
+            diffs_ieds = np.abs(ieds - d)
+            if np.min(diffs_ieds) <= tol:
+                FP += 1
+                continue
+
+        # 3. If it matches neither, we don't care (Ignore)
+        ignored_detections += 1
+
+    FN = int(np.sum(~used_true))
+
+    # Metric Calculations
+    sensitivity = TP / (TP + FN) if (TP + FN) > 0 else np.nan
+    # Precision is now: TPs / (TPs + detections that were actually IEDs)
+    precision = TP / (TP + FP) if (TP + FP) > 0 else np.nan
+    f1 = 2 * TP / (2 * TP + FP + FN) if (2*TP + FP + FN) > 0 else np.nan
+
+    return {
+        "TP": TP,
+        "FP": FP,
+        "FN": FN,
+        "ignored": ignored_detections,
         "sensitivity": float(sensitivity),
         "precision": float(precision),
         "f1": float(f1)
@@ -97,7 +151,7 @@ tol_qualities = []
 tol_range = range(10)
 
 for tol in tol_range:
-    tol_qualities.append(compute_detection_quality(sim_stim_times, arr_sw_trunc, tol=tol))
+    tol_qualities.append(compute_detection_quality_strict(sim_stim_times, arr_sw_trunc, tol=tol))
 
 sens, prec, f1 = ([q["sensitivity"] for q in tol_qualities],
                   [q["precision"] for q in tol_qualities],
@@ -121,7 +175,7 @@ plt.show()
 
 # Regex to extract p and c from: results_zerocross_run_all_p3_c1.pkl
 result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
-run_num = 29
+run_num = 32
 
 all_results = []
 tol_range = np.linspace(0.1, 1, num=10)
@@ -136,12 +190,19 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
     # assuming the format is Patient03_Channel1_negSWs.npy
     gt_filename = f"Patient{int(p):02d}_Channel{c}_negSWs.npy"
     gt_path = os.path.join("data/annotated", gt_filename)
+
+    ied_filename = f"Patient{int(p):02d}_Channel{c}_IEDs.npy"
+    ied_path = os.path.join("data/annotated", ied_filename)
     
-    if int(p) >= 12:
-        continue
+    # if int(p) >= 7:
+    #     continue
 
     if not os.path.exists(gt_path):
         print(f"Warning: No ground truth found for P{p} C{c}")
+        continue
+
+    if not os.path.exists(ied_path):
+        print(f"Warning: No IED file found for P{p} C{c}")
         continue
 
     # load and process
@@ -151,6 +212,9 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
     this_times = np.array(this_result.stims_sp) / this_result.Dataset.fs
     this_sws = np.load(gt_path)
     this_sws = np.array([x for x in this_sws if x <= this_result.Dataset.t.max()])
+
+    this_ieds = np.load(ied_path)
+    this_ieds = np.array([x for x in this_ieds if x <= this_result.Dataset.t.max()])
 
     # Check for empty ground truth
     if len(this_sws) == 0:
@@ -162,9 +226,19 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
         continue
 
     tol_results = []
-    for tol in tol_range:
-        this_stats = compute_detection_quality(this_times, this_sws, tol=tol)
-        tol_results.append(this_stats)
+
+    # this is wrong!! it should only compute sensitivity, but not precision in this case
+
+    if len(this_ieds) == 0:
+        for tol in tol_range:
+            this_stats = compute_detection_quality_strict(this_times, this_sws, tol=tol)
+            this_stats["FP"] = np.nan
+            this_stats["precision"] = np.nan    
+            tol_results.append(this_stats)
+    else:
+        for tol in tol_range:
+            this_stats = compute_detection_quality_loose(this_times, this_sws, this_ieds, tol=tol)
+            tol_results.append(this_stats)            
 
     all_results.append(tol_results)
 all_results = np.array(all_results)
@@ -218,7 +292,7 @@ plt.show()
 
 # %%
 
-best_run = np.nanargmax(all_stats[:,1,-1])
+best_run = np.nanargmin(all_stats[:,1,-1])
 
 print(all_stats[:,1,-1])
 print(best_run)

@@ -76,7 +76,7 @@ def find_maxima(signal, times, fs, window_size_s, low_pass=None):
     
     return np.array(max_idx, dtype=int)
 
-def find_minima(signal, times, fs, window_size_s, low_pass=None):
+def find_minima(signal, times, fs=512, window_size_s=4, low_pass=None):
     min_idx = []
     
     # low-pass filter signal such that maximum is not high-freq jitter
@@ -107,7 +107,7 @@ def find_minima(signal, times, fs, window_size_s, low_pass=None):
     
     return np.array(min_idx, dtype=int)
 
-def get_signal_subsets_from_events(signal, idx, fs, window_size_s):
+def get_signal_subsets_from_events(signal, idx, fs=512, window_size_s=4):
     windows = []
     window_size_idx = int(window_size_s * fs)
     expected_length = 2 * window_size_idx
