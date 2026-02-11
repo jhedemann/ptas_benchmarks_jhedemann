@@ -20,17 +20,20 @@ def get_stim_waveforms(eeg, stims):
     returns subsets of the signal aligned to the trough around each index.
     """
     stims_minima = find_minima(eeg, stims, window_size_s=2)
-    stims_subsets = get_signal_subsets_from_events(eeg, stims_minima, window_size_s=2)
+    stims_subsets = get_signal_subsets_from_events(eeg, stims_minima, window_size_s=1)
 
     return stims_subsets
 
 def plot_avg_waveform(ax,
                       waveforms):
+    waveforms = np.array(waveforms)
+    print(waveforms.shape)
     avg_waveform = np.mean(waveforms, axis=0)
-    std_waveform = np.std(waveforms, axis=0)
+    n = waveforms.shape[0]
+    sem_waveform = np.std(waveforms, axis=0) / np.sqrt(n)
     time_axis = np.linspace(-2, 2, avg_waveform.shape[0])
 
-    ax.fill_between(time_axis, avg_waveform - std_waveform, avg_waveform + std_waveform,
+    ax.fill_between(time_axis, avg_waveform - sem_waveform, avg_waveform + sem_waveform,
                         alpha=0.2)
     ax.plot(time_axis, avg_waveform)
     ax.set_xlabel("Time / s")
@@ -141,8 +144,8 @@ def plot_master(axs,
     for p, cs in p_c_struct.items():
 
         print(f"starting patient {p}")
-        # if int(p) > 4:
-        #     continue
+        if int(p) > 4:
+            continue
         for c in cs:
 
             result_filename = f"results_twave_all_p{int(p)}_c{c}.pkl"
@@ -188,3 +191,5 @@ plot_master(axs=[ax1, ax2, ax3])
 plt.tight_layout()
 plt.show()
 
+
+# %%
