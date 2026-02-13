@@ -72,6 +72,50 @@ class SimulationResult():
         self.wave_detected_sp = wave_detected_sp
         self.computed_stim_phases = {}
 
+    def plot_raw_signal_excerpt(
+        self,
+        ground_truth_sw,
+        ground_truth_ied,
+        time_lim: tuple,
+        axis_kwargs: Optional[dict] = None,
+    ):
+        """
+        Plot the time series of the signal and the phase tracker status, applying
+        the time_mask to all plotting calls.
+        """
+        # Define a time_mask that covers the whole data if time_lim is not provided.
+        if time_lim is not None:
+            time_mask = (self.Dataset.t >= time_lim[0]) & \
+                        (self.Dataset.t <= time_lim[1])
+        else:
+            time_mask = slice(None)  # This allows slicing the full array
+
+        path_sw = Path(ground_truth_sw)
+        path_ied = Path(ground_truth_ied)
+
+        arr_sw = np.load(path_sw)
+        arr_ied = np.load(path_ied)
+
+        arr_sw_trunc = np.array([x for x in arr_sw if x <= self.Dataset.t.max()])
+        arr_ied_trunc = np.array([x for x in arr_ied if x <= self.Dataset.t.max()])
+
+        # Create the figure and axes.
+        fig, ax = plt.subplots(1, 1, figsize=(9, 9), sharex=True)
+
+        # Plot the raw signal and the filtered signal.
+        tax = ax
+        tax.plot(self.Dataset.t[time_mask],
+                 self.Dataset.signal[time_mask],
+                 color='black')
+
+        tax.set_title(f'Example Slow Oscillation from intracranial EEG trace')
+        tax.set_ylabel('Amplitude (µV)')
+        tax.set_xlabel('Time (s)')
+        #tax.legend()
+        # tax.grid()
+
+        return fig
+
     def plot_timeseries(
         self,
         ground_truth_sw,
@@ -132,30 +176,34 @@ class SimulationResult():
         tax.plot(self.Dataset.t[time_mask],
                  self.Dataset.signal[time_mask],
                  color='black',
-                 lw=0.1,
-                 alpha=0.8)
-        tax.plot(self.Dataset.t[time_mask],
-                 amp_trace, # changed from filtered_signal
-                 color='tab:blue',
-                 label='Morlet Amplitude')
-        tax.plot(self.Dataset.t[time_mask],
-                 filtered_signal,
-                 color='hotpink',
-                 label='Filtered Signal')
-        tax.plot(self.Dataset.t[time_mask],
-                 hl_ratio_trace,
-                 color='limegreen',
-                 label='High Low Ratio')
-        tax.plot(self.Dataset.t[time_mask],
-                 quad_trace,
-                 color='orange',
-                 label='Quadrature')                           
-        tax.vlines(arr_sw_trunc, -3000, 3000, colors="green")
-        tax.vlines(arr_ied_trunc, -3000, 3000, colors="red")
+                 lw=0.5)
+        # tax.plot(self.Dataset.t[time_mask],
+        #          self.Dataset.signal[time_mask],
+        #          color='black',
+        #          lw=0.1,
+        #          alpha=0.8)
+        # tax.plot(self.Dataset.t[time_mask],
+        #          amp_trace, # changed from filtered_signal
+        #          color='tab:blue',
+        #          label='Morlet Amplitude')
+        # tax.plot(self.Dataset.t[time_mask],
+        #          filtered_signal,
+        #          color='hotpink',
+        #          label='Filtered Signal')
+        # tax.plot(self.Dataset.t[time_mask],
+        #          hl_ratio_trace,
+        #          color='limegreen',
+        #          label='High Low Ratio')
+        # tax.plot(self.Dataset.t[time_mask],
+        #          quad_trace,
+        #          color='orange',
+        #          label='Quadrature')                           
+        tax.vlines(arr_sw_trunc, -20000, -12500, colors="green")
+        # tax.vlines(arr_ied_trunc, -20000, -12500, colors="red", lw=0.5)
         tax.set_title(f'{self.PhaseTracker.name} - {self.Dataset.name}')
         tax.set_ylabel('Signal')
         tax.legend()
-        tax.grid()
+        # tax.grid()
         if axis_kwargs:
             tax.set(**axis_kwargs)
 
