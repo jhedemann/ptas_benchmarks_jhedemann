@@ -20,7 +20,7 @@ class PhaseTracker():
         # store CLAS parameters
         self.amp_threshold_uv = 3000 # changed from 4000, 2000, 80, 500, 250, 80
         self.amp_limit_uv = 6000 # changed from 2000, 3000, 2000, 4000, 600
-        self.prediction_limit_s = 0.15
+        self.prediction_limit_s = 0.03 # changed from 0.15
         self.backoff_time_s = 2.5 # changed from 5.0
         self.quadrature_thresh = 0.5 # changed from 0.5, 0.8, 0.2
         self.quadrature_len_s = 2.0 # changed from 1.0, 2.0
@@ -238,7 +238,7 @@ class PhaseTracker():
             return PhaseTrackerResult(
                 PhaseTrackerStatus.BACKOFF_ISI), internals
 
-        ### perform forward prediction ###
+        ## perform forward prediction ###
         delta_t = ((self.target_phase_rad - phase - pi / 12) %
                    (2 * pi)) / (cfreq * 2 * pi)
 

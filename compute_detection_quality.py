@@ -175,10 +175,12 @@ plt.show()
 
 # Regex to extract p and c from: results_zerocross_run_all_p3_c1.pkl
 result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
-run_num = 32
+run_num = 40
 
 all_results = []
 tol_range = np.linspace(0.1, 1, num=10)
+num_stims = 0
+num_stims_per_run = []
 
 for res_file in os.listdir(f"results/run_all/run{run_num}"):
     # extract IDs
@@ -194,7 +196,7 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
     ied_filename = f"Patient{int(p):02d}_Channel{c}_IEDs.npy"
     ied_path = os.path.join("data/annotated", ied_filename)
     
-    # if int(p) >= 7:
+    # if int(p) > 7:
     #     continue
 
     if not os.path.exists(gt_path):
@@ -240,8 +242,11 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
             this_stats = compute_detection_quality_loose(this_times, this_sws, this_ieds, tol=tol)
             tol_results.append(this_stats)            
 
+    num_stims += len(this_times)
+    num_stims_per_run.append(len(this_times))
     all_results.append(tol_results)
 all_results = np.array(all_results)
+num_stims_per_run = np.array(num_stims_per_run)
 
 print(all_results.shape)
 
@@ -249,6 +254,7 @@ print(all_results.shape)
 
 print(all_results)
 print(len(tol_results))
+print(num_stims)
 # %%
 
 data_struct = get_p_c_struct("data/annotated")
@@ -312,7 +318,7 @@ clean_precision = precision_at_1s[~np.isnan(precision_at_1s)]
 
 # plot histogram
 plt.figure(figsize=(9, 6))
-plt.hist(clean_precision, bins=np.arange(0, 1.1, 0.05), 
+plt.hist(clean_precision,
          color='skyblue', edgecolor='black', alpha=0.8)
 
 # Add a vertical line for the mean
@@ -327,4 +333,10 @@ plt.legend()
 plt.grid(axis='y', alpha=0.3)
 plt.tight_layout()
 plt.show()
+# %%
+
+plt.figure(figsize=(9, 6))
+plt.plot(num_stims_per_run)
+plt.show()
+
 # %%

@@ -126,7 +126,7 @@ def plot_fp_prop_hist(ax,
 
 def plot_master(axs,
                 data_dir="data/annotated",
-                out_dir="results/run_all/run32"):
+                out_dir="results/run_all/run40"):
     """
     Takes an axes object and fills it with an average waveform plot
     according to the data in the passed directory.
@@ -144,8 +144,8 @@ def plot_master(axs,
     for p, cs in p_c_struct.items():
 
         print(f"starting patient {p}")
-        if int(p) > 4:
-            continue
+        # if int(p) > 7:
+        #     continue
         for c in cs:
 
             result_filename = f"results_twave_all_p{int(p)}_c{c}.pkl"
