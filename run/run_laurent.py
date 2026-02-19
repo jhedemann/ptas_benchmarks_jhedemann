@@ -4,16 +4,19 @@ import numpy as np
 from pathlib import Path
 import re
 import pickle
+from scipy.signal import butter, sosfiltfilt, resample_poly
+import matplotlib.pyplot as plt
 
-from load_intracranial_data import load_data_as_dataset
+from utils.load_intracranial_data import load_data_as_dataset, load_sw_annotation
+from utils.analyze_time_frequency import get_signal_subsets_from_events
 
-import Simulations
-from Algo_TWave import PhaseTracker as TWave
+import algos.Simulations
+from algos.Algo_Laurent import PhaseTracker as Laurent
 
 
 # %%
 
-time_excerpt = 600 # seconds
+time_excerpt = 240 # seconds
 sampling_rate = 512 # hz
 
 # %% RUN ALGO ON ALL PARTICIPANTS AND CHANNELS
@@ -51,15 +54,13 @@ pairs.sort()
 
 for p, c, eeg_fp, negsw_fp in pairs:
 
-    if p < 3:
-        continue
+    # if p > 8:
+    #     continue
 
-    ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=time_excerpt)
+    ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate)
+    # ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=time_excerpt)
 
-    result = Simulations.run_simulations(ds, TWave(fs=ds.fs))
+    result = Simulations.run_simulations(ds, Laurent(fs=ds.fs))
 
-    # with open(f"results/run_all/run31/results_twave_all_p{p}_c{c}.pkl", "wb") as f:
-    #     pickle.dump(result, f)
-
-    with open(f"results/run_all/run40/results_twave_all_p{p}_c{c}.pkl", "wb") as f:
+    with open(f"results/run_all/run29/results_laurent_all_p{p}_c{c}.pkl", "wb") as f:
         pickle.dump(result, f)

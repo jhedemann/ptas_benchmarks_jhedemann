@@ -33,9 +33,12 @@ def plot_avg_waveform(ax,
     sem_waveform = np.std(waveforms, axis=0) / np.sqrt(n)
     time_axis = np.linspace(-2, 2, avg_waveform.shape[0])
 
-    ax.fill_between(time_axis, avg_waveform - sem_waveform, avg_waveform + sem_waveform,
-                        alpha=0.2)
-    ax.plot(time_axis, avg_waveform)
+    for waveform in waveforms:
+        ax.plot(time_axis, waveform, lw=0.2, alpha=0.2, color="black")
+
+    # ax.fill_between(time_axis, avg_waveform - sem_waveform, avg_waveform + sem_waveform,
+    #                     alpha=0.2)
+    ax.plot(time_axis, avg_waveform, color="red")
     ax.set_xlabel("Time / s")
     ax.set_ylabel("Amplitude / microV")
     ax.set_title("Average Waveform of Detected Events")
@@ -63,8 +66,8 @@ def plot_phase_dist(ax,
     ax.hist(phases,
              bins=30,
              range=(0, 2 * pi),
-             color='slateblue',
-             edgecolor='black',
+             color='turquoise',
+             edgecolor='lightseagreen',
              linewidth=0.5)    
     r_max = 1.2 * ax.get_ylim()[1]
 
@@ -106,6 +109,7 @@ def get_false_positives(stims,
 
     return prop_false_ieds
 
+
 def plot_fp_prop_hist(ax,
                       fp_props):
 
@@ -124,9 +128,55 @@ def plot_fp_prop_hist(ax,
     ax.grid(axis='y', alpha=0.3)
     return ax
 
+def get_fp_and_tn(stims,
+                        ieds,
+                        buffer_s=1):
+    """
+    Takes a SimulationResult object and
+    gets proportion of IEDs that were falsely detected.
+    """
+    if len(ieds) == 0 or len(stims) == 0:
+        return 0
+    
+    false_detect_ieds = [i for i in ieds if
+                         np.min(np.abs(stims - i)) < buffer_s]
+    # if not false_detect_ieds:
+    #     false_detect_ieds = 0
+
+    true_undetect_ieds = [i for i in ieds if
+                          np.min(np.abs(stims - i)) >= buffer_s]
+    # if not true_undetect_ieds:
+    #     true_undetect_ieds = 0
+    
+    return [len(false_detect_ieds), len(true_undetect_ieds)]
+
+def plot_fp_and_tn_total(ax,
+                  counts_total):
+
+    # ax.hist(fp_props, bins=np.arange(0, 1.1, 0.05), 
+    #          color='skyblue', edgecolor='black', alpha=0.8)
+
+    # # Add a vertical line for the mean
+    # ax.axvline(np.mean(fp_props), color='red', linestyle='--', 
+    #             label=f'mean precision: {np.mean(fp_props):.3f}')
+
+    ax.bar(["falsely stimulated", "correctly rejected"], counts_total,
+           color="turquoise",
+           edgecolor='lightseagreen',
+           linewidth=0.5)
+    ax.text(x=0.05, y=0.925,
+            s=f'mean precision: {counts_total[0]/counts_total[1]:.3f}',
+            transform=ax.transAxes
+            )
+
+    ax.set_title("stimulation/rejection of IEDs (tolerance = 1.0s)")
+    ax.set_ylabel("count (number of IEDs)")
+    ax.grid(axis='y', alpha=0.3)
+    return ax
+
 def plot_master(axs,
                 data_dir="data/annotated",
-                out_dir="results/run_all/run40"):
+                out_dir="results/run_all/run20"):
     """
     Takes an axes object and fills it with an average waveform plot
     according to the data in the passed directory.
@@ -140,11 +190,12 @@ def plot_master(axs,
     all_ps_wavs = []
     all_ps_phases = []
     all_ps_fp_props = []
+    all_ied_stats = [0,0]
 
     for p, cs in p_c_struct.items():
 
         print(f"starting patient {p}")
-        # if int(p) > 7:
+        # if int(p) > 2:
         #     continue
         for c in cs:
 
@@ -169,6 +220,8 @@ def plot_master(axs,
             # append false positive prop to list
             all_ps_fp_props.append(get_false_positives(this_times, this_ieds))
 
+            # append ied stats to list
+            all_ied_stats = np.add(all_ied_stats, get_fp_and_tn(this_times, this_ieds))
 
     # plot average waveform
     plot_avg_waveform(axs[0], all_ps_wavs)
@@ -176,8 +229,11 @@ def plot_master(axs,
     # plot phase distribution
     plot_phase_dist(axs[1], all_ps_phases, target_phase=0)
 
-    # plot detection precision
-    plot_fp_prop_hist(axs[2], all_ps_fp_props)
+    # # plot detection precision (option 1)
+    # plot_fp_prop_hist(axs[2], all_ps_fp_props)
+
+    # plot detection precision (option 2)
+    plot_fp_and_tn_total(axs[2], all_ied_stats)
 
 # %% MAIN SCRIPT
 
@@ -191,5 +247,3 @@ plot_master(axs=[ax1, ax2, ax3])
 plt.tight_layout()
 plt.show()
 
-
-# %%

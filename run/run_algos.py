@@ -1,22 +1,19 @@
 # %% IMPORTS
 
-from pathlib import Path
 import numpy as np
-from scipy.signal import butter, sosfiltfilt, resample_poly
+from scipy.signal import butter, sosfiltfilt
 import pickle
-import os
 
-from load_intracranial_data import load_data_as_dataset
+from utils.load_intracranial_data import load_data_as_dataset
 
-import Simulations
-from Algo_PLL import PhaseTracker as PLL
-from Algo_TWave import PhaseTracker as TWave
-from Algo_AmpTh import PhaseTracker as AmpTh
-from Algo_SineFit import PhaseTracker as SineFit
-from Algo_ZeroCrossing import PhaseTracker as ZeroCross
+import algos.Simulations
+from algos.Algo_PLL import PhaseTracker as PLL
+from algos.Algo_TWave import PhaseTracker as TWave
+from algos.Algo_AmpTh import PhaseTracker as AmpTh
+from algos.Algo_SineFit import PhaseTracker as SineFit
+from algos.Algo_ZeroCrossing import PhaseTracker as ZeroCross
 
-from Inhibitors import *
-from tqdm import tqdm
+from algos.Inhibitors import *
 
 # %%
 
@@ -81,14 +78,14 @@ print("duration_s (from x):", len(x)/ds.fs)
 
 # %%
 
-ds2 = Simulations.SimulationDataset(
+ds2 = algos.Simulations.SimulationDataset(
     t=np.arange(len(x)) / ds.fs,
     signal=x,
     fs=ds.fs,
     name=ds.name + f"_bp03-4_ds{ds.fs}",
 )
 
-rslt = Simulations.run_simulations(ds2, TWave(ds2.fs))
+rslt = algos.Simulations.run_simulations(ds2, TWave(ds2.fs))
 
 with open("results_twave_downsampled_128.pkl", "wb") as f:
     pickle.dump(rslt, f)

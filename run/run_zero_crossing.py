@@ -7,11 +7,11 @@ import pickle
 from scipy.signal import butter, sosfiltfilt, resample_poly
 import matplotlib.pyplot as plt
 
-from load_intracranial_data import load_data_as_dataset, load_sw_annotation
-from analyze_time_frequency import get_signal_subsets_from_events
+from utils.load_intracranial_data import load_data_as_dataset, load_sw_annotation
+from utils.analyze_time_frequency import get_signal_subsets_from_events
 
-import Simulations
-from Algo_Laurent import PhaseTracker as Laurent
+import algos.Simulations
+from algos.Algo_ZeroCrossing import PhaseTracker as ZeroCross
 
 
 # %%
@@ -57,10 +57,9 @@ for p, c, eeg_fp, negsw_fp in pairs:
     # if p > 8:
     #     continue
 
-    ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate)
-    # ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=time_excerpt)
+    ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=time_excerpt)
 
-    result = Simulations.run_simulations(ds, Laurent(fs=ds.fs))
+    result = Simulations.run_simulations(ds, ZeroCross(fs=ds.fs, amp_q=0.05))
 
-    with open(f"results/run_all/run29/results_laurent_all_p{p}_c{c}.pkl", "wb") as f:
+    with open(f"results/run_all/run25/results_zerocrossrun_all_p{p}_c{c}.pkl", "wb") as f:
         pickle.dump(result, f)

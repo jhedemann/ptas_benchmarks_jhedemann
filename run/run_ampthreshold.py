@@ -7,11 +7,11 @@ import pickle
 from scipy.signal import butter, sosfiltfilt, resample_poly
 import matplotlib.pyplot as plt
 
-from load_intracranial_data import load_data_as_dataset, load_sw_annotation
-from analyze_time_frequency import get_signal_subsets_from_events
+from utils.load_intracranial_data import load_data_as_dataset, load_sw_annotation
+from utils.analyze_time_frequency import get_signal_subsets_from_events
 
-import Simulations
-from Algo_AmpTh import PhaseTracker as AmpThreshold
+import algos.Simulations
+from algos.Algo_AmpTh import PhaseTracker as AmpThreshold
 
 # %% CONFIG
 

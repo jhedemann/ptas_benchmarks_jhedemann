@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from load_intracranial_data import load_sw_annotation
+from utils.load_intracranial_data import load_sw_annotation
 
-from Simulations import PhaseTrackerStatus
+from algos.Simulations import PhaseTrackerStatus
 
 # %% LOAD DATA
 

@@ -278,17 +278,18 @@ print(mean_all)
 plt.figure(figsize=(8, 5))
 
 plt.plot(tol_range, mean_all[0], label="sensitivity (true detected / all slow waves)")
-#plt.fill_between(tol_range, mean_all[0] - std_all[0], mean_all[0] + std_all[0], color='blue', alpha=0.2, label='$\pm$ 1 SD')
+# #plt.fill_between(tol_range, mean_all[0] - std_all[0], mean_all[0] + std_all[0], color='blue', alpha=0.2, label='$\pm$ 1 SD')
 
 plt.plot(tol_range, mean_all[1], label="precision (true detected / all detected)")
 plt.fill_between(tol_range, mean_all[1] - std_all[1], mean_all[1] + std_all[1], color='orange', alpha=0.2, label='$\pm$ 1 SD')
 
 plt.plot(tol_range, mean_all[2], label="f1 score")
-#plt.fill_between(tol_range, mean_all[2] - std_all[2], mean_all[2] + std_all[2], color='green', alpha=0.2, label='$\pm$ 1 SD')
+# #plt.fill_between(tol_range, mean_all[2] - std_all[2], mean_all[2] + std_all[2], color='green', alpha=0.2, label='$\pm$ 1 SD')
 
 
 plt.xlabel("tolerance (s)")
 plt.ylabel("score")
+plt.title("Quality metrics of adapted TWave algorithm")
 #plt.ylim(0, 1.05)
 plt.grid(True, alpha=0.3)
 plt.legend()

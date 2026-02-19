@@ -1,25 +1,21 @@
 # %% IMPORTS
 
-import numpy as np
 from pathlib import Path
 import re
 import pickle
-from scipy.signal import butter, sosfiltfilt, resample_poly
-import matplotlib.pyplot as plt
 
-from load_intracranial_data import load_data_as_dataset, load_sw_annotation
-from analyze_time_frequency import get_signal_subsets_from_events
+from utils.load_intracranial_data import load_data_as_dataset
 
 import Simulations
-from Algo_ZeroCrossing import PhaseTracker as ZeroCross
+from Algo_TWave import PhaseTracker as TWave
 
 
-# %%
+# %% CONFIG
 
-time_excerpt = 240 # seconds
+time_excerpt = 600 # seconds
 sampling_rate = 512 # hz
 
-# %% RUN ALGO ON ALL PARTICIPANTS AND CHANNELS
+# %% GET DIRECTORY STRUCTURE AND EEG FILES
 
 DATA_DIR = Path("data/annotated")
 
@@ -45,21 +41,17 @@ pairs = []
 for (p, c, kind), eeg_fp in index.items():
     if kind != "EEG":
         continue
-    negsw_fp = index.get((p, c, "negSWs"))  # only negative slow waves
-    pairs.append((p, c, eeg_fp, negsw_fp))
+    pairs.append((p, c, eeg_fp))
 
 pairs.sort()
 
-# %%
+# %% RUN ALGORITHM ON ALL EEG FILES
 
-for p, c, eeg_fp, negsw_fp in pairs:
-
-    # if p > 8:
-    #     continue
+for p, c, eeg_fp in pairs:
 
     ds = load_data_as_dataset(npy_path=eeg_fp, fs=sampling_rate, max_duration_s=time_excerpt)
 
-    result = Simulations.run_simulations(ds, ZeroCross(fs=ds.fs, amp_q=0.05))
+    result = Simulations.run_simulations(ds, TWave(fs=ds.fs))
 
-    with open(f"results/run_all/run25/results_zerocrossrun_all_p{p}_c{c}.pkl", "wb") as f:
+    with open(f"results/run_all/run40/results_twave_all_p{p}_c{c}.pkl", "wb") as f:
         pickle.dump(result, f)

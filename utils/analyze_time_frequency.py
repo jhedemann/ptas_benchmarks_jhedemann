@@ -7,10 +7,9 @@ from pathlib import Path
 import os
 from collections import defaultdict
 
+from algos.Simulations import SimulationDataset
 
-from Simulations import SimulationDataset
-
-from load_intracranial_data import load_data_as_dataset
+from utils.load_intracranial_data import load_data_as_dataset
 
 # %% FUNCTIONS
 
@@ -305,6 +304,7 @@ def do_event_tfr_on_all(in_dir: str,
             ied_tfr=final_ied_tfr,
             sw_signal=np.array(this_p_sw_signals, dtype=object),
             ied_signal=np.array(this_p_ied_signals, dtype=object),
+            baseline_powers=baseline_vector.flatten(),
             freqs=freq_range,
             p_id=p
         )
@@ -336,7 +336,8 @@ def load_tfr_results(tfr_dir):
                 "sw_tfr": data['sw_tfr'].copy() if 'sw_tfr' in data else None,
                 "ied_tfr": data['ied_tfr'].copy() if 'ied_tfr' in data else None,
                 "sw_signal": data['sw_signal'].copy() if 'sw_signal' in data else None,
-                "ied_signal": data['ied_signal'].copy() if 'ied_signal' in data else None
+                "ied_signal": data['ied_signal'].copy() if 'ied_signal' in data else None,
+                "baseline_powers": data['baseline_powers'].copy() if 'baseline_powers' in data else None
             }
             all_results.append(p_dict)
             
@@ -501,7 +502,7 @@ if __name__ == "__main__":
 
     # %% TFR ON ALL DATA
 
-    # all_ps_tfr_dict = do_event_tfr_on_all(
+    # do_event_tfr_on_all(
     #     in_dir="data/annotated",
     #     freq_range=freq_range,
     #     out_dir="tfr/align_minima_both"
@@ -511,11 +512,26 @@ if __name__ == "__main__":
 
     results_list = load_tfr_results("tfr/align_minima_both")
 
-    # 2. Compute the Grand Average Data ONCE
-    grand_avg = get_grand_average_data(results_list, freq_range)
+    # # 2. Compute the Grand Average Data ONCE
+    # grand_avg = get_grand_average_data(results_list, freq_range)
 
-    # 3. Plot the standard comparison (SW vs IED)
-    plot_single_tfr(grand_avg, freq_range)
+    # # 3. Plot the standard comparison (SW vs IED)
+    # plot_single_tfr(grand_avg, freq_range)
 
-    # 4. Plot the difference (SW - IED)
-    plot_tfr_difference(grand_avg, freq_range)
+    # # 4. Plot the difference (SW - IED)
+    # plot_tfr_difference(grand_avg, freq_range)
+
+
+    # Plot a 1/f curve
+    baseline_powers = np.array([result["baseline_powers"] for result in results_list])
+    print(baseline_powers.shape)
+    baseline_powers_mean = np.mean(baseline_powers, axis=0)
+    print(baseline_powers_mean)
+
+    plt.plot(freq_range, np.log(baseline_powers_mean), color="black")
+    plt.axvline(50, linestyle="--", color="red", label="line noise")
+    plt.legend()
+    plt.title("1/f Plot of Intracranial EEG")
+    plt.xlabel("Frequency (Hz)")
+    plt.ylabel("Log Power (a.u.)")
+    plt.show()
