@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import scipy
 from math import pi
 
-from analyze_time_frequency import find_minima, get_signal_subsets_from_events, get_p_c_struct
+from utils.analyze_time_frequency import find_minima, get_signal_subsets_from_events, get_p_c_struct
 
 # %% CONFIG
 
@@ -36,8 +36,8 @@ def plot_avg_waveform(ax,
     for waveform in waveforms:
         ax.plot(time_axis, waveform, lw=0.2, alpha=0.2, color="black")
 
-    # ax.fill_between(time_axis, avg_waveform - sem_waveform, avg_waveform + sem_waveform,
-    #                     alpha=0.2)
+    ax.fill_between(time_axis, avg_waveform - sem_waveform, avg_waveform + sem_waveform,
+                    alpha=0.2)
     ax.plot(time_axis, avg_waveform, color="red")
     ax.set_xlabel("Time / s")
     ax.set_ylabel("Amplitude / microV")
@@ -46,12 +46,7 @@ def plot_avg_waveform(ax,
     return ax
 
 def get_phase_dist(result):
-    """
-    Takes a SimulationResult object and gets phase distribution
-    of stimulation times.
 
-    :param axs: SimulationResult
-    """
     stim_phases = result.compute_stim_phase()
 
     return stim_phases
@@ -129,8 +124,8 @@ def plot_fp_prop_hist(ax,
     return ax
 
 def get_fp_and_tn(stims,
-                        ieds,
-                        buffer_s=1):
+                  ieds,
+                  buffer_s=1):
     """
     Takes a SimulationResult object and
     gets proportion of IEDs that were falsely detected.
@@ -140,25 +135,13 @@ def get_fp_and_tn(stims,
     
     false_detect_ieds = [i for i in ieds if
                          np.min(np.abs(stims - i)) < buffer_s]
-    # if not false_detect_ieds:
-    #     false_detect_ieds = 0
-
     true_undetect_ieds = [i for i in ieds if
                           np.min(np.abs(stims - i)) >= buffer_s]
-    # if not true_undetect_ieds:
-    #     true_undetect_ieds = 0
     
     return [len(false_detect_ieds), len(true_undetect_ieds)]
 
 def plot_fp_and_tn_total(ax,
                   counts_total):
-
-    # ax.hist(fp_props, bins=np.arange(0, 1.1, 0.05), 
-    #          color='skyblue', edgecolor='black', alpha=0.8)
-
-    # # Add a vertical line for the mean
-    # ax.axvline(np.mean(fp_props), color='red', linestyle='--', 
-    #             label=f'mean precision: {np.mean(fp_props):.3f}')
 
     ax.bar(["falsely stimulated", "correctly rejected"], counts_total,
            color="turquoise",
@@ -172,6 +155,7 @@ def plot_fp_and_tn_total(ax,
     ax.set_title("stimulation/rejection of IEDs (tolerance = 1.0s)")
     ax.set_ylabel("count (number of IEDs)")
     ax.grid(axis='y', alpha=0.3)
+
     return ax
 
 def plot_master(axs,
@@ -185,6 +169,7 @@ def plot_master(axs,
     :param data_fir: str
     :param out_dir: str
     """
+    
     p_c_struct = get_p_c_struct(data_dir)
 
     all_ps_wavs = []
@@ -238,9 +223,9 @@ def plot_master(axs,
 # %% MAIN SCRIPT
 
 fig = plt.figure(figsize=(15, 5))
-ax1 = fig.add_subplot(1, 3, 1) # Normal
-ax2 = fig.add_subplot(1, 3, 2, projection='polar') # Polar for Phase
-ax3 = fig.add_subplot(1, 3, 3) # Normal
+ax1 = fig.add_subplot(1, 3, 1)
+ax2 = fig.add_subplot(1, 3, 2, projection='polar')
+ax3 = fig.add_subplot(1, 3, 3)
 
 plot_master(axs=[ax1, ax2, ax3])
 

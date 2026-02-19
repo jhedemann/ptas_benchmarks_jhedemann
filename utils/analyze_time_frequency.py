@@ -3,11 +3,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import mne
-from pathlib import Path
 import os
 from collections import defaultdict
-
-from algos.Simulations import SimulationDataset
 
 from utils.load_intracranial_data import load_data_as_dataset
 
@@ -191,10 +188,9 @@ def do_event_tfr_on_all(in_dir: str,
                         low_pass_filter_freq = 4,
                         empty_window_buffer_s = 12):
     
-    ## prep data for tfr
+    # prep data for tfr
 
     p_c_struct = get_p_c_struct(in_dir)
-    all_ps_tfr = []
     all_ps_sw_signals = []
     all_ps_ied_signals = []
 
@@ -327,10 +323,9 @@ def load_tfr_results(tfr_dir):
     for filename in files:
         path = os.path.join(tfr_dir, filename)
         
-        # 'with' ensures the file is closed after loading
         with np.load(path, allow_pickle=True) as data:
+
             # Reconstruct the dictionary format
-            # Using .copy() ensures the data is in RAM, not just a file pointer
             p_dict = {
                 "p_id": str(data['p_id']),
                 "sw_tfr": data['sw_tfr'].copy() if 'sw_tfr' in data else None,
@@ -339,6 +334,7 @@ def load_tfr_results(tfr_dir):
                 "ied_signal": data['ied_signal'].copy() if 'ied_signal' in data else None,
                 "baseline_powers": data['baseline_powers'].copy() if 'baseline_powers' in data else None
             }
+
             all_results.append(p_dict)
             
     print(f"Successfully loaded {len(all_results)} participant results.")
@@ -349,6 +345,7 @@ def plot_single_tfr(p_results, freq_range, window_size_s=4):
     p_results: dict containing 'sw_tfr' and 'ied_tfr'
     freq_range: the frequency array used in TFR
     """
+
     sw_data = p_results['sw_tfr']
     ied_data = p_results['ied_tfr']
     p_id = p_results.get('p_id', 'Unknown')
@@ -432,7 +429,7 @@ def get_grand_average_data(all_ps_results, freq_range):
     def unravel_nested_signals(signal_list):
         # Flatten the nested structure: Patients -> Channels -> Events -> Samples
         flat_list = []
-        for p_data in signal_list:       # p_data is a list of channel data
+        for p_data in signal_list:      # p_data is a list of channel data
             for c_data in p_data:       # c_data is a (n_events, n_samples) array
                 if len(c_data) > 0:
                     flat_list.append(c_data)

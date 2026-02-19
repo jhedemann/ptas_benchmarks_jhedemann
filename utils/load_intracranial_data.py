@@ -17,6 +17,7 @@ def load_intracranial_npy(path, fs, name=None, max_duration_s=None, data_units="
       - (n_channels, n_samples)  -> takes channel 0
       - (n_samples, n_channels)  -> takes channel 0
     """
+
     path = Path(path)
     arr = np.load(path)
 
@@ -75,19 +76,3 @@ if __name__ == "__main__":
 
     ds = load_data_as_dataset("/home/jhedemann/ptas_benchmarks_jhedemann/data/annotated/Patient03_Channel1_EEG.npy", fs=1024)
     print(ds.name, ds.fs, ds.signal.shape, ds.signal.min(), ds.signal.max())
-
-    # %%
-
-    x = ds.signal.squeeze()
-    print("median(|x|):", np.median(np.abs(x)))
-    print("p95(|x|):", np.percentile(np.abs(x), 95))
-    print("p99(|x|):", np.percentile(np.abs(x), 99))
-    print("min/max:", x.min(), x.max())
-
-    # %%
-    path_sw_annot = "/home/jhedemann/ptas_benchmarks_jhedemann/data/annotated/Patient03_Channel1_negSWs.npy"
-
-    arr_sw_annot = load_sw_annotation(path_sw_annot)
-    print(arr_sw_annot.shape)
-
-    # %%

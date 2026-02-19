@@ -93,12 +93,6 @@ class SimulationResult():
         path_sw = Path(ground_truth_sw)
         path_ied = Path(ground_truth_ied)
 
-        arr_sw = np.load(path_sw)
-        arr_ied = np.load(path_ied)
-
-        arr_sw_trunc = np.array([x for x in arr_sw if x <= self.Dataset.t.max()])
-        arr_ied_trunc = np.array([x for x in arr_ied if x <= self.Dataset.t.max()])
-
         # Create the figure and axes.
         fig, ax = plt.subplots(1, 1, figsize=(9, 9), sharex=True)
 
@@ -111,8 +105,6 @@ class SimulationResult():
         tax.set_title(f'Example Slow Oscillation from intracranial EEG trace')
         tax.set_ylabel('Amplitude (µV)')
         tax.set_xlabel('Time (s)')
-        #tax.legend()
-        # tax.grid()
 
         return fig
 
@@ -133,30 +125,13 @@ class SimulationResult():
                                                            <= time_lim[1])
         else:
             time_mask = slice(None)  # This allows slicing the full array
-
-        # # Design the filter.
-        # butter_filt = scipy.signal.butter(2, [0.5, 4],
-        #                                   'bandpass',
-        #                                   fs=self.Dataset.fs)
-
-        # # Filter only the data within the time range.
-        # filtered_signal = scipy.signal.filtfilt(butter_filt[0], butter_filt[1],
-        #                                         self.Dataset.signal[time_mask])
         
         sos = scipy.signal.butter(4, [0.5, 4.0], btype="bandpass", fs=self.Dataset.fs, output="sos")
-        filtered_signal = scipy.signal.sosfiltfilt(sos, self.Dataset.signal[time_mask])
+        # filtered_signal = scipy.signal.sosfiltfilt(sos, self.Dataset.signal[time_mask])
 
-        amp_trace = [d["amp"] for d in self.internals_ts]
-        hl_ratio_trace = [d["hl_ratio"]*1000 for d in self.internals_ts]
-        quad_trace = [d["quadrature"]*1000 for d in self.internals_ts]
-
-        # # Parse ground-truth markdown file
-        # with open(ground_truth, "r", encoding="utf-8") as input_file:
-        #     text = input_file.read()
-        # lines = text.splitlines()[1:]  # skip header
-        # ground_truth_sw_times = np.array([int(line.split()[0]) / self.Dataset.fs for line in lines if line.strip()])
-        # print(ground_truth_sw_times.max())
-        # ground_truth_sw_times_trunc = np.array([x for x in ground_truth_sw_times if x <= self.Dataset.t.max()])
+        # amp_trace = [d["amp"] for d in self.internals_ts]
+        # hl_ratio_trace = [d["hl_ratio"]*1000 for d in self.internals_ts]
+        # quad_trace = [d["quadrature"]*1000 for d in self.internals_ts]
 
         # Parse ground_truth npy files
         path_sw = Path(ground_truth_sw)
@@ -199,7 +174,7 @@ class SimulationResult():
         #          color='orange',
         #          label='Quadrature')                           
         tax.vlines(arr_sw_trunc, -20000, -12500, colors="green")
-        # tax.vlines(arr_ied_trunc, -20000, -12500, colors="red", lw=0.5)
+        tax.vlines(arr_ied_trunc, -20000, -12500, colors="red", lw=0.5)
         tax.set_title(f'{self.PhaseTracker.name} - {self.Dataset.name}')
         tax.set_ylabel('Signal')
         tax.legend()

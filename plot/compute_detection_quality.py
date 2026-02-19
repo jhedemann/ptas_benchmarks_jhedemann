@@ -8,34 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-from Algo_ZeroCrossing import RollingQuantileThreshold
-from Algo_Laurent import _OnlineSOSFilter
-import Simulations
+# %% CONFIG
 
-# %% PREP
-
-# Parse simulation results file
-all_runs = os.listdir("results/run_all")
-print(all_runs[1])
-with open(f"results/run_all/{all_runs[1]}", "rb") as f:
-    results_twave = pickle.load(f)
-
-# Parse ground_truth npy files
-path_sw = Path("data/annotated/Patient02_Channel2_negSWs.npy")
-path_ied = Path("data/annotated/Patient02_Channel2_IEDs.npy")
-
-arr_sw = np.load(path_sw)
-arr_ied = np.load(path_ied)
-
-arr_sw_trunc = np.array([x for x in arr_sw if x <= results_twave.Dataset.t.max()])
-arr_ied_trunc = np.array([x for x in arr_ied if x <= results_twave.Dataset.t.max()])
-
-print(len(arr_sw_trunc))
-
-sim_stim_times = np.array(results_twave.stims_sp) / results_twave.Dataset.fs
-
-#print(arr_sw_trunc)
-#print(arr_ied_trunc)
+# Regex to extract p and c from: results_TWAVE_run_all_p3_c1.pkl
+result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
+run_num = 40
 
 # %% FUNCTIONS
 
@@ -145,37 +122,7 @@ def compute_detection_quality_loose(detected_sim, detected_true, ieds, tol=0.1):
         "f1": float(f1)
     }
 
-# %% MAIN SCRIPT
-
-tol_qualities = []
-tol_range = range(10)
-
-for tol in tol_range:
-    tol_qualities.append(compute_detection_quality_strict(sim_stim_times, arr_sw_trunc, tol=tol))
-
-sens, prec, f1 = ([q["sensitivity"] for q in tol_qualities],
-                  [q["precision"] for q in tol_qualities],
-                  [q["f1"] for q in tol_qualities])
-
-plt.figure(figsize=(8, 5))
-
-plt.plot(tol_range, sens, label="sensitivity (true detected / all slow waves)")
-plt.plot(tol_range, prec, label="precision (true detected / all detected)")
-plt.plot(tol_range, f1, label="f1 score")
-
-plt.xlabel("tolerance (s)")
-plt.ylabel("score")
-#plt.ylim(0, 1.05)
-plt.grid(True, alpha=0.3)
-plt.legend()
-plt.tight_layout()
-plt.show()
-
 # %% COMPUTE STATISTICS ACROSS ALL PATIENTS
-
-# Regex to extract p and c from: results_zerocross_run_all_p3_c1.pkl
-result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
-run_num = 40
 
 all_results = []
 tol_range = np.linspace(0.1, 1, num=10)
@@ -195,9 +142,6 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
 
     ied_filename = f"Patient{int(p):02d}_Channel{c}_IEDs.npy"
     ied_path = os.path.join("data/annotated", ied_filename)
-    
-    # if int(p) > 7:
-    #     continue
 
     if not os.path.exists(gt_path):
         print(f"Warning: No ground truth found for P{p} C{c}")
@@ -245,20 +189,11 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
     num_stims += len(this_times)
     num_stims_per_run.append(len(this_times))
     all_results.append(tol_results)
+
 all_results = np.array(all_results)
 num_stims_per_run = np.array(num_stims_per_run)
 
 print(all_results.shape)
-
-# %%
-
-print(all_results)
-print(len(tol_results))
-print(num_stims)
-# %%
-
-data_struct = get_p_c_struct("data/annotated")
-print(data_struct)
 
 # %% COMPUTE AND PLOT STATS FOR ALL PATIENTS AND CHANNELS
 
@@ -273,43 +208,26 @@ for result in all_results:
 all_stats = np.array(all_stats)
 mean_all = np.nanmean(all_stats, axis=0)
 std_all = np.nanstd(all_stats, axis=0)
+
 print(mean_all)
 
 plt.figure(figsize=(8, 5))
 
 plt.plot(tol_range, mean_all[0], label="sensitivity (true detected / all slow waves)")
-# #plt.fill_between(tol_range, mean_all[0] - std_all[0], mean_all[0] + std_all[0], color='blue', alpha=0.2, label='$\pm$ 1 SD')
 
 plt.plot(tol_range, mean_all[1], label="precision (true detected / all detected)")
 plt.fill_between(tol_range, mean_all[1] - std_all[1], mean_all[1] + std_all[1], color='orange', alpha=0.2, label='$\pm$ 1 SD')
 
 plt.plot(tol_range, mean_all[2], label="f1 score")
-# #plt.fill_between(tol_range, mean_all[2] - std_all[2], mean_all[2] + std_all[2], color='green', alpha=0.2, label='$\pm$ 1 SD')
-
 
 plt.xlabel("tolerance (s)")
 plt.ylabel("score")
 plt.title("Quality metrics of adapted TWave algorithm")
-#plt.ylim(0, 1.05)
 plt.grid(True, alpha=0.3)
 plt.legend()
 plt.tight_layout()
 plt.show()
 
-
-# %%
-
-best_run = np.nanargmin(all_stats[:,1,-1])
-
-print(all_stats[:,1,-1])
-print(best_run)
-print(np.min(all_stats[:,1,-1]))
-print(p)
-
-print(os.listdir(f"results/run_all/run{run_num}")[best_run])
-
-# %%
-print(all_stats[27,1,:])
 # %% PLOT HISTOGRAM OF PRECISION VALUES AT TOLERANCE 1s
 
 precision_at_1s = all_stats[:, 1, -1]
@@ -334,10 +252,3 @@ plt.legend()
 plt.grid(axis='y', alpha=0.3)
 plt.tight_layout()
 plt.show()
-# %%
-
-plt.figure(figsize=(9, 6))
-plt.plot(num_stims_per_run)
-plt.show()
-
-# %%

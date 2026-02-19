@@ -4,18 +4,18 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 from pathlib import Path
-import Simulations
+import Simulations as Simulations
 from Simulations import PhaseTrackerStatus
 import os
 from scipy import stats
-from scipy.signal import butter, sosfilt, sosfilt_zi, sosfiltfilt
+from scipy.signal import butter, sosfilt, sosfilt_zi
 import re
 
-from analyze_time_frequency import get_p_c_struct, filter_for_competing_events, find_minima, find_maxima
-from load_intracranial_data import load_data_as_dataset
+from utils.analyze_time_frequency import get_p_c_struct, filter_for_competing_events, find_minima, find_maxima
+from utils.load_intracranial_data import load_data_as_dataset
 
 
-# %% LOAD DATA
+# %% CONFIG
 
 patient03_channel1_eeg = np.load("data/annotated/Patient03_Channel1_EEG.npy")
 patient03_channel1_sws = np.load("data/annotated/Patient03_Channel1_negSWs.npy")
@@ -26,8 +26,12 @@ with open("results/results_zerocross_patient03_channel1_08_newbackoff_sp.pkl", "
 
 data_dir = "data/annotated"
 p_c_struct = get_p_c_struct(data_dir)
-run_dir = "results/run_all/run19"
+run_dir = "results/run_all/run40"
 fs = 512
+
+# Regex to extract p and c from: results_zerocross_run_all_p3_c1.pkl
+result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
+run_num = 40
 
 # %% COMPUTE MEAN ABSOLUTE AMPLITUDE AROUND GROUND TRUTH SLOW WAVE VS NON-SLOW-WAVE
 
@@ -150,7 +154,6 @@ for i in arr_sw_trunc:
     
 # %% INVESTIGATE hl_ratio
 
-#print(results_twave.internals_ts)
 internals = results_twave.internals_ts
 
 hl_ratios = []
@@ -161,6 +164,7 @@ print(len(hl_ratios))
 print(hl_ratios[:20])
 
 print(np.sum(hl_ratios))
+
 # %% ANALYZE MINIMAL AMPLITUDE DISTRIBUTION OF IEDs vs SWs
 
 min_amps_sw = []
@@ -212,11 +216,6 @@ print("Mean amplitude of trough low point:")
 print("SW: ", mean_min_amp_sw)
 print("IED: ", mean_min_amp_ied)
 
-# plt.hist(min_amps_ied, bins=20, alpha=0.3, density=True, label="IED pos amps")
-# plt.hist(min_amps_sw, bins=20, alpha=0.3, density=True, label="SW pos amps")
-# plt.legend()
-# plt.show()
-
 p_range = [20, 10, 5, 1, 0.1]
 sw_percentiles = np.nanpercentile(min_amps_sw, p_range)
 ied_percentiles = np.nanpercentile(min_amps_ied, p_range)
@@ -230,7 +229,6 @@ for p, sw_val, ied_val in zip(p_range, sw_percentiles, ied_percentiles):
 # line break
 print()
 
-# Define the specific amplitudes you want to check
 amp_values = [-5000, -4000, -3000, -2000]
 
 # Convert lists to numpy arrays
@@ -246,10 +244,8 @@ print(f"{'Amplitude':<12} | {'SW %-tile':<10} | {'IED %-tile':<10}")
 print("-" * 38)
 
 for val in amp_values:
-    # kind='rank' gives the percentage of values less than or equal to the score
     sw_p = stats.percentileofscore(sw_clean, val, kind='rank')
     ied_p = stats.percentileofscore(ied_clean, val, kind='rank')
-    
     print(f"{val:<12} | {sw_p:>10.2f}% | {ied_p:>10.2f}%")
 
 # %% ANALYZE MAXIMAL AMPLITUDE DISTRIBUTION OF IEDs vs SWs
@@ -336,7 +332,6 @@ print("-" * 35)
 for p, sw_val, ied_val, fp_val in zip(p_range, sw_percentiles, ied_percentiles, fp_percentiles):
     print(f"{p:<12} | {sw_val:>10.2f} | {ied_val:>10.2f} | {fp_val:>10.2f}")
 
-# Define the specific amplitudes you want to check
 amp_values = [2000, 3000, 4000, 5000]
 
 # Convert lists to numpy arrays
@@ -352,7 +347,6 @@ print(f"{'Amplitude':<12} | {'SW %-tile':<10} | {'IED %-tile':<10}")
 print("-" * 38)
 
 for val in amp_values:
-    # kind='rank' gives the percentage of values less than or equal to the score
     sw_p = stats.percentileofscore(sw_clean, val, kind='rank')
     ied_p = stats.percentileofscore(ied_clean, val, kind='rank')
     
@@ -443,8 +437,6 @@ print("IED mean amp diff ", np.mean(amp_diffs_ied[:,2]))
 
 
 plt.scatter(min_max_amps_sw[:,1], min_max_amps_sw[:,0])
-# plt.hist(max_amps_sw, bins=50, alpha=0.3, density=True, label="SW pos amps")
-# plt.legend()
 plt.show()
 
 print(np.corrcoef(min_max_amps_sw[:,1], min_max_amps_sw[:,0]))
@@ -528,7 +520,6 @@ fwhm_ratios_fp = []
 fwhm_ratios_sws = []
 fwhm_ratios_ieds = []
 
-
 for p, cs in p_c_struct.items():
 
     for c in cs:
@@ -580,21 +571,21 @@ for p, cs in p_c_struct.items():
 
             t_width = get_trough_fwhm(signal, trough_idx)
 
-            # 1. Look back 500ms (256 samples) to find the 'uptick'
+            # look back 500ms (256 samples) to find the 'uptick'
             lookback = 256
             search_start = max(0, trough_idx - lookback)
             
-            # 2. Find the local maximum (the peak) before the trough
+            # find the local maximum (the peak) before the trough
             pre_window = signal[search_start : trough_idx]
             if pre_window.size == 0:
                 fwhm_ratios_ieds.append(np.nan)
                 continue
                 
-            # Index of the max relative to the search_start
+            # index of the max relative to the search_start
             local_peak_idx = np.argmax(pre_window)
             absolute_peak_idx = search_start + local_peak_idx
             
-            # 3. Compute the width of that specific peak
+            # compute the width of that specific peak
             p_width = get_peak_fwhm(signal, absolute_peak_idx, fs=fs)
 
             if t_width > 0:
@@ -604,21 +595,21 @@ for p, cs in p_c_struct.items():
 
             t_width = get_trough_fwhm(signal, trough_idx)
 
-            # 1. Look back 500ms (256 samples) to find the 'uptick'
+            # look back 500ms (256 samples) to find the 'uptick'
             lookback = 256
             search_start = max(0, trough_idx - lookback)
             
-            # 2. Find the local maximum (the peak) before the trough
+            # find the local maximum (the peak) before the trough
             pre_window = signal[search_start : trough_idx]
             if pre_window.size == 0:
                 fwhm_ratios_ieds.append(np.nan)
                 continue
                 
-            # Index of the max relative to the search_start
+            # index of the max relative to the search_start
             local_peak_idx = np.argmax(pre_window)
             absolute_peak_idx = search_start + local_peak_idx
             
-            # 3. Compute the width of that specific peak
+            # compute the width of that specific peak
             p_width = get_peak_fwhm(signal, absolute_peak_idx, fs=fs)
 
             if t_width > 0:
@@ -628,21 +619,21 @@ for p, cs in p_c_struct.items():
 
             t_width = get_trough_fwhm(signal, trough_idx)
 
-            # 1. Look back 500ms (256 samples) to find the 'uptick'
+            # look back 500ms (256 samples) to find the 'uptick'
             lookback = 256
             search_start = max(0, trough_idx - lookback)
             
-            # 2. Find the local maximum (the peak) before the trough
+            # find the local maximum (the peak) before the trough
             pre_window = signal[search_start : trough_idx]
             if pre_window.size == 0:
                 fwhm_ratios_ieds.append(np.nan)
                 continue
                 
-            # Index of the max relative to the search_start
+            # index of the max relative to the search_start
             local_peak_idx = np.argmax(pre_window)
             absolute_peak_idx = search_start + local_peak_idx
             
-            # 3. Compute the width of that specific peak
+            # compute the width of that specific peak
             p_width = get_peak_fwhm(signal, absolute_peak_idx, fs=fs)
 
             if t_width > 0:
@@ -652,7 +643,7 @@ fwhm_ratios_fp = np.array(fwhm_ratios_fp)
 fwhm_ratios_sws = np.array(fwhm_ratios_sws)
 fwhm_ratios_ieds = np.array(fwhm_ratios_ieds)
 
-# Filter out extreme ratios (e.g., > 2.0) to see a cleaner mean/std
+# filter out extreme ratios (e.g., > 2.0) to see a cleaner mean/std
 clean_ied_ratios = fwhm_ratios_ieds[fwhm_ratios_ieds < 2.0]
 
 print("FP stats:")
@@ -675,11 +666,11 @@ print(f"IED IQR: {np.percentile(fwhm_ratios_ieds, 75) - np.percentile(fwhm_ratio
 
 plt.figure(figsize=(10, 6))
 
-# Plotting the distributions
+# plotting the distributions
 plt.hist(fwhm_ratios_sws, bins=50, alpha=0.5, label='Slow Waves', color='blue', range=(0, 1.5))
 plt.hist(fwhm_ratios_ieds, bins=50, alpha=0.5, label='IEDs', color='orange', range=(0, 1.5))
 
-# Add lines for the Medians
+# add lines for the medians
 plt.axvline(np.median(fwhm_ratios_sws), color='blue', linestyle='dashed', linewidth=2, label='SW Median')
 plt.axvline(np.median(fwhm_ratios_ieds), color='orange', linestyle='dashed', linewidth=2, label='IED Median')
 
@@ -692,6 +683,7 @@ plt.show()
 
 print(fwhm_ratios_sws.shape)
 print(fwhm_ratios_ieds.shape)
+
 # %% COMPUTE HIGH FREQUENCY AMPLITUDE ENERGY AROUND EVENTS 
 
 max_amps_sw = []
@@ -756,7 +748,7 @@ for p, cs in p_c_struct.items():
         this_max_amps_ied = hf_signal[ied_maxima]
         this_max_amps_fp = hf_signal[fp_maxima]
         this_max_amps_fn = hf_signal[fn_maxima]
-        #print(len(this_max_amps_sw))
+
         # extend list 
         max_amps_sw.extend(this_max_amps_sw)
         max_amps_ied.extend(this_max_amps_ied)
@@ -776,8 +768,6 @@ mean_max_amp_fn = np.mean(max_amps_fn)
 print("")
 print(mean_max_amp_sw, mean_max_amp_ied, mean_max_amp_fp, mean_max_amp_fn)
 
-#plt.hist(max_amps_ied, bins=50, alpha=0.3, density=True, label="IED pos amps")
-#plt.hist(max_amps_sw, bins=50, alpha=0.3, density=True, label="SW pos amps")
 plt.hist(max_amps_fp, bins=20, alpha=0.3, density=True, label="FP pos amps")
 plt.hist(max_amps_fn, bins=20, alpha=0.3, density=True, label="FN pos amps")
 
@@ -797,32 +787,7 @@ print("-" * 35)
 for p, sw_val, ied_val, fp_val, fn_val in zip(p_range, sw_percentiles, ied_percentiles, fp_percentiles, fn_percentiles):
     print(f"{p:<12} | {sw_val:>10.2f} | {ied_val:>10.2f} | {fp_val:>10.2f} | {fn_val:>10.2f}") 
 
-# # Define the specific amplitudes you want to check
-# amp_values = [2000, 3000, 4000, 5000]
-
-# # Convert lists to numpy arrays
-# sw_array = np.array(max_amps_sw)
-# ied_array = np.array(max_amps_ied)
-
-# # Use the arrays for the masking operation
-# sw_clean = sw_array[~np.isnan(sw_array)]
-# ied_clean = ied_array[~np.isnan(ied_array)]
-
-# # Print the results in the same structure as before
-# print(f"{'Amplitude':<12} | {'SW %-tile':<10} | {'IED %-tile':<10}")
-# print("-" * 38)
-
-# for val in amp_values:
-#     # kind='rank' gives the percentage of values less than or equal to the score
-#     sw_p = stats.percentileofscore(sw_clean, val, kind='rank')
-#     ied_p = stats.percentileofscore(ied_clean, val, kind='rank')
-    
-#     print(f"{val:<12} | {sw_p:>10.2f}% | {ied_p:>10.2f}%")
 # %% INSPECT QUADRATURE VALUES
-
-# Regex to extract p and c from: results_zerocross_run_all_p3_c1.pkl
-result_pat = re.compile(r"p(?P<p>\d+)_c(?P<c>\d+)")
-run_num = 22
 
 all_internals = []
 stim_internals = []
@@ -858,16 +823,6 @@ for res_file in os.listdir(f"results/run_all/run{run_num}"):
 
     this_stim_internals = this_internals[this_times]
     this_first_internals = this_internals[this_first]
-    # this_sws = np.load(gt_path)
-    # this_sws = np.array([x for x in this_sws if x <= this_result.Dataset.t.max()])
-
-    # # Check for empty ground truth
-    # if len(this_sws) == 0:
-    #     print(f"Skipping P{p} C{c}: No ground truth slow waves found.")
-        
-    #     # append NaNs if you need to keep a fixed index
-    #     all_internals.append()
-    #     continue
 
     all_internals.extend(this_internals)
     stim_internals.extend(this_stim_internals)
@@ -893,7 +848,6 @@ print(np.mean(all_quadratures))
 print(np.mean(stim_quadratures))
 print(np.mean(first_quadratures))
 
-#plt.hist(all_quadratures, bins=50, alpha=0.5, density=True, label="all quadrature values")
 plt.hist(stim_quadratures, bins=50, alpha=0.5, density=True, label="stim quadrature values")
 plt.hist(first_quadratures, bins=50, alpha=0.5, density=True, label="first quadrature values")
 
@@ -908,7 +862,6 @@ print(np.mean(all_phases))
 print(np.mean(stim_phases))
 print(np.mean(first_phases))
 
-#plt.hist(all_phases, bins=50, alpha=0.5, density=True, label="all phase values")
 plt.hist(stim_phases, bins=50, alpha=0.5, density=True, label="stim phase values")
 plt.hist(first_phases, bins=50, alpha=0.5, density=True, label="first phase values")
 
@@ -922,9 +875,6 @@ wrongphase_quad = all_quadratures[wrongphase_idx]
 non_wrongphase_quad = all_quadratures[~wrongphase_idx]
 
 plt.hist(wrongphase_quad, bins=50, alpha=0.5, density=True, label="wrongphase quadrature values")
-#plt.hist(all_quadratures, bins=50, alpha=0.5, density=True, label="all quadrature values")
-#plt.hist(stim_quadratures, bins=50, alpha=0.15, density=True, label="stim quadrature values")
-#plt.hist(first_quadratures, bins=50, alpha=0.15, density=True, label="first quadrature values")
 
 plt.legend()
 plt.show()

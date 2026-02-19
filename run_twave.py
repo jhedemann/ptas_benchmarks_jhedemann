@@ -15,9 +15,9 @@ from Algo_TWave import PhaseTracker as TWave
 time_excerpt = 600 # seconds
 sampling_rate = 512 # hz
 
-# %% GET DIRECTORY STRUCTURE AND EEG FILES
-
 DATA_DIR = Path("data/annotated")
+
+# %% GET DIRECTORY STRUCTURE AND EEG FILES
 
 pat = re.compile(r"^Patient(?P<p>\d+)_Channel(?P<c>\d+)_(?P<kind>.+)\.npy$")
 
