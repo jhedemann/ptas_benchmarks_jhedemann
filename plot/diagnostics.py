@@ -4,8 +4,8 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 from pathlib import Path
-import Simulations as Simulations
-from Simulations import PhaseTrackerStatus
+import utils.Simulations as Simulations
+from utils.Simulations import PhaseTrackerStatus
 import os
 from scipy import stats
 from scipy.signal import butter, sosfilt, sosfilt_zi

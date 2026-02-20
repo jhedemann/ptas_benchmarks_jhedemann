@@ -6,7 +6,7 @@ import pickle
 
 from utils.load_intracranial_data import load_data_as_dataset
 
-import Simulations
+import utils.Simulations as Simulations
 from Algo_TWave import PhaseTracker as TWave
 
 

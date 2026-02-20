@@ -110,8 +110,8 @@ class SimulationResult():
 
     def plot_timeseries(
         self,
-        ground_truth_sw,
-        ground_truth_ied,
+        ground_truth_sw = None,
+        ground_truth_ied = None,
         axis_kwargs: Optional[dict] = None,
         time_lim: Optional[tuple] = None,
     ):
@@ -132,16 +132,6 @@ class SimulationResult():
         # amp_trace = [d["amp"] for d in self.internals_ts]
         # hl_ratio_trace = [d["hl_ratio"]*1000 for d in self.internals_ts]
         # quad_trace = [d["quadrature"]*1000 for d in self.internals_ts]
-
-        # Parse ground_truth npy files
-        path_sw = Path(ground_truth_sw)
-        path_ied = Path(ground_truth_ied)
-
-        arr_sw = np.load(path_sw)
-        arr_ied = np.load(path_ied)
-
-        arr_sw_trunc = np.array([x for x in arr_sw if x <= self.Dataset.t.max()])
-        arr_ied_trunc = np.array([x for x in arr_ied if x <= self.Dataset.t.max()])
 
         # Create the figure and axes.
         fig, ax = plt.subplots(3, 1, figsize=(16, 9), sharex=True)
@@ -173,8 +163,19 @@ class SimulationResult():
         #          quad_trace,
         #          color='orange',
         #          label='Quadrature')                           
-        tax.vlines(arr_sw_trunc, -20000, -12500, colors="green")
-        tax.vlines(arr_ied_trunc, -20000, -12500, colors="red", lw=0.5)
+
+        # Parse ground_truth npy files
+        if ground_truth_sw is not None:
+            path_sw = Path(ground_truth_sw)
+            arr_sw = np.load(path_sw)
+            arr_sw_trunc = np.array([x for x in arr_sw if x <= self.Dataset.t.max()])
+            tax.vlines(arr_sw_trunc, -20000, -12500, colors="green")
+        if ground_truth_ied is not None:
+            path_ied = Path(ground_truth_ied)
+            arr_ied = np.load(path_ied)
+            arr_ied_trunc = np.array([x for x in arr_ied if x <= self.Dataset.t.max()])
+            tax.vlines(arr_ied_trunc, -20000, -12500, colors="red", lw=0.5)
+
         tax.set_title(f'{self.PhaseTracker.name} - {self.Dataset.name}')
         tax.set_ylabel('Signal')
         tax.legend()

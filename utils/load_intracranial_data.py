@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import numpy as np
-from Simulations import SimulationDataset
+from utils.Simulations import SimulationDataset
 
 # %% FUNCTIONS
 

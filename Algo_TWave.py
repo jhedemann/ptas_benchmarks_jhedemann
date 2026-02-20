@@ -1,5 +1,5 @@
 import numpy as np
-from Simulations import PhaseTrackerResult, PhaseTrackerStatus
+from utils.Simulations import PhaseTrackerResult, PhaseTrackerStatus
 from typing import Tuple
 from math import nan, pi, isnan
 from collections import deque
@@ -9,7 +9,7 @@ import scipy.signal
 class PhaseTracker():
     name = 'TWave'
 
-    def __init__(self, fs: int, target_phase: float = 0, **kwargs):
+    def __init__(self, fs: int, target_phase: float = 0, is_ieeg: bool = True, **kwargs):
         self.ampbuffer = np.zeros(10)
         self.fs = fs
 
@@ -18,8 +18,12 @@ class PhaseTracker():
         self.time_elapsed_s = 0.0  # float: in seconds, relative to end of last block/start of current block
 
         # store CLAS parameters
-        self.amp_threshold_uv = 3000 # changed from 4000, 2000, 80, 500, 250, 80
-        self.amp_limit_uv = 6000 # changed from 2000, 3000, 2000, 4000, 600
+        if is_ieeg:
+            self.amp_threshold_uv = 3000 # changed from 4000, 2000, 80, 500, 250, 80
+            self.amp_limit_uv = 6000 # changed from 2000, 3000, 2000, 4000, 600
+        else:
+            self.amp_threshold_uv = 50
+            self.amp_limit_uv = 100
         self.prediction_limit_s = 0.03 # changed from 0.15
         self.backoff_time_s = 2.5 # changed from 5.0
         self.quadrature_thresh = 0.5 # changed from 0.5, 0.8, 0.2

@@ -1,7 +1,21 @@
 # %% IMPORTS
 
-import pickle
+import sys
 import os
+from pathlib import Path
+
+# Add the utils directory itself to the path
+# This allows Pickle to find 'Simulations' even if it's not prefixed with 'utils.'
+utils_path = str(Path(__file__).resolve().parent.parent / "utils")
+if utils_path not in sys.path:
+    sys.path.insert(0, utils_path)
+
+root_path = os.path.abspath(os.path.join(os.getcwd(), ".."))
+
+if root_path not in sys.path:
+    sys.path.append(root_path)
+
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
@@ -33,8 +47,8 @@ def plot_avg_waveform(ax,
     sem_waveform = np.std(waveforms, axis=0) / np.sqrt(n)
     time_axis = np.linspace(-2, 2, avg_waveform.shape[0])
 
-    for waveform in waveforms:
-        ax.plot(time_axis, waveform, lw=0.2, alpha=0.2, color="black")
+    # for waveform in waveforms:
+    #     ax.plot(time_axis, waveform, lw=0.2, alpha=0.2, color="black")
 
     ax.fill_between(time_axis, avg_waveform - sem_waveform, avg_waveform + sem_waveform,
                     alpha=0.2)
@@ -222,13 +236,35 @@ def plot_master(axs,
 
 # %% MAIN SCRIPT
 
-fig = plt.figure(figsize=(15, 5))
-ax1 = fig.add_subplot(1, 3, 1)
-ax2 = fig.add_subplot(1, 3, 2, projection='polar')
-ax3 = fig.add_subplot(1, 3, 3)
+# fig = plt.figure(figsize=(15, 5))
+# ax1 = fig.add_subplot(1, 3, 1)
+# ax2 = fig.add_subplot(1, 3, 2, projection='polar')
+# ax3 = fig.add_subplot(1, 3, 3)
 
-plot_master(axs=[ax1, ax2, ax3])
+# plot_master(axs=[ax1, ax2, ax3])
+
+# plt.tight_layout()
+# plt.show()
+
+# %% EAR EEG
+
+fig = plt.figure(figsize=(10, 5))
+ax1 = fig.add_subplot(1, 2, 1)
+ax2 = fig.add_subplot(1, 2, 2, projection='polar')
+
+result_filename = "results_twave_ear-eeg_p001_s001_c0_t3600.pkl"
+result_filepath = os.path.join("/home/jhedemann/ptas_benchmarks_jhedemann/results/run_on_ear_eeg/", result_filename)
+with open(result_filepath, "rb") as f:
+    this_result = pickle.load(f)
+this_times = np.array(this_result.stims_sp) / this_result.Dataset.fs
+this_signal = this_result.Dataset.signal
+
+wavs = get_stim_waveforms(this_signal, this_times)
+phases = get_phase_dist(this_result)
+
+plot_avg_waveform(ax1, wavs)
+plot_phase_dist(ax2, phases, target_phase=0)
 
 plt.tight_layout()
 plt.show()
-
+# %%
